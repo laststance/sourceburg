@@ -338,3 +338,81 @@ neither.
 already runs at all three viewports — not a new spec file.
 
 **Depends on / blocked by:** Nothing.
+
+---
+
+## 9. The manifest keeps two clocks under one name, and it has killed republishing
+
+**Status:** open, real, shipped. Found on 2026-09-01 by re-running `pnpm verify`
+against the published article at the end of step 10 — not by any test, because
+every fixture sets both fields from the same string, and the bug lives exactly
+in the gap between what the fixtures do and what the pipeline does.
+
+`content/incidents/field-array-key-thrash/manifest.json` today:
+
+```
+publishedAt  2026-05-17T23:41:25Z        <- event time, copied from the article
+updatedAt    2026-09-01T07:50:40.701Z    <- pipeline wall clock, stamped at bin/verify.ts:78
+```
+
+Two fields side by side, in two different clocks. `publishedAt` is the
+fact-set's `knownAt`; `updatedAt` is `new Date()` at publish. The comment at
+`bin/verify.ts:76` states that second choice deliberately — "the writer decides
+what the story says, the pipeline decides when a version became live" — and on
+its own it is defensible. The defect is that nothing else was moved to match.
+
+**`lib/verify/verify.ts:439` then compares the two clocks against each other:**
+
+```ts
+if (article.updatedAt <= previous.updatedAt)   // event time <= wall clock
+```
+
+Wall clock is always later than the event time it records, so this is always
+true, so **every republish FAILs before it reaches `publish()`**:
+
+```
+FAIL  updatedAt strictly increases
+        was 2026-09-01T07:50:40.701Z, now 2026-05-17T23:41:25Z
+FAIL (15 probes, 1 findings)
+```
+
+**And this incident can never be republished at all.** `updatedAt` is derived
+from `knownAt`, `knownAt` is the anchor's date, and `anchorSha` is inside the
+identity tuple — so moving the anchor to get a later `knownAt` makes it a
+different incident rather than a new version of this one. The value on the left
+of that comparison is frozen forever; the value on the right only grows.
+
+The `publishedAt`-is-frozen rule passes for the mirror-image reason: both sides
+of *that* comparison happen to be event time. One rule works by luck and its
+neighbour fails by luck, from a single root cause.
+
+`publish()` already carries the same guard in the right units at
+`lib/publish.ts:188` (`options.updatedAt < previous.updatedAt`), where both
+values are pipeline-stamped. So the verifier's rule is a duplicate expressed in
+the wrong currency.
+
+**Three fixes, and the choice is a real product call, not a cleanup:**
+
+- **(a) Store the article's `updatedAt` in the manifest.** One line at
+  `bin/verify.ts:78`. Both manifest fields become event time, the verifier rule
+  compares like with like and starts working. **Cost:** a prose-only
+  regeneration — same facts, same `knownAt`, better writing — produces an equal
+  `updatedAt` and is then blocked by "strictly increases". That case is real;
+  the skill's own description says "write, draft, or *regenerate*".
+- **(b) Keep the wall clock, delete the verifier rule.** Republishing works,
+  including prose-only regeneration, and `publish()`'s guard carries the
+  invariant. **Cost:** the check moves after the gate, so a violation arrives as
+  a thrown crash (exit 2, INDETERMINATE) rather than a FAIL naming the rule —
+  which is the wrong verdict for a wrong fact.
+- **(c) Two fields, two names.** The manifest keeps `updatedAt` as the live
+  stamp the Atom feed wants, and records the article's own value alongside it;
+  the verifier compares event time to event time. **Cost:** one more field in
+  the manifest, and `Manifest` was deliberately collapsed to one definition in
+  `f25a4d8` — this re-widens it slightly.
+
+Whichever is chosen, the test that would have caught this is the same: a
+republish fixture whose article `updatedAt` and manifest `updatedAt` come from
+**different** sources, because every existing fixture sets them from one string.
+
+**Depends on / blocked by:** a decision on (a)/(b)/(c). The code change is
+minutes in every case.
