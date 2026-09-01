@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+import { datedFacts, incidentRefIndex, parseFactRef, revealedRefFor } from './facts'
+import type { FactRefParsed } from './facts'
+
 /*
  * The fact-set contract. Every later layer reads this, so it is the one place
  * in the vertical slice worth being slow about.
@@ -94,7 +97,7 @@ export const Incident = z.strictObject({
   ),
   codeQuotes: z.array(
     z
-      .object({
+      .strictObject({
         path: RepoPath,
         atSha: Sha,
         atShaCommittedAt: Utc,
@@ -105,7 +108,7 @@ export const Incident = z.strictObject({
       .refine((q) => q.startLine <= q.endLine, 'reversed line range'),
   ),
   diff: z
-    .object({ beforeSha: Sha, afterSha: Sha, path: RepoPath, hunk: z.string() })
+    .strictObject({ beforeSha: Sha, afterSha: Sha, path: RepoPath, hunk: z.string() })
     .nullable(),
   revealedLater: z.array(
     z.strictObject({
@@ -118,6 +121,90 @@ export const Incident = z.strictObject({
     }),
   ),
 })
+  .check((ctx) => {
+    const { knownAt } = ctx.value
+    /*
+     * The knownAt partition is what makes the "time machine" claim true: the
+     * breaking-news half may only use facts that existed at publication, and the
+     * aftermath may only use facts that did not.
+     *
+     * Both sides are `Z`-normalized by {@link Utc}, so a plain string compare IS
+     * a chronological compare. That is the payoff for rejecting zone offsets.
+     *
+     * The two boundary directions are deliberately asymmetric: a fact dated
+     * EXACTLY at knownAt passes (the anchor commit is itself such a fact), while
+     * a revelation dated exactly at knownAt fails, because a revelation knowable
+     * at publication is not aftermath.
+     */
+    const notAfterKnownAt = (at: string, path: (string | number)[], label: string) => {
+      if (at > knownAt) {
+        ctx.issues.push({
+          code: 'custom',
+          input: ctx.value,
+          path,
+          message: `${label} is dated after knownAt (${at} > ${knownAt})`,
+        })
+      }
+    }
+    ctx.value.commits.forEach((commit, i) =>
+      notAfterKnownAt(commit.committedAt, ['commits', i, 'committedAt'], `commit ${commit.sha.slice(0, 8)}`),
+    )
+    ctx.value.discussions.forEach((discussion, i) => {
+      notAfterKnownAt(
+        discussion.createdAt,
+        ['discussions', i, 'createdAt'],
+        `${discussion.kind} #${discussion.number}`,
+      )
+      discussion.quotes.forEach((quote, j) =>
+        notAfterKnownAt(
+          quote.createdAt,
+          ['discussions', i, 'quotes', j, 'createdAt'],
+          `comment by ${quote.author}`,
+        ),
+      )
+    })
+    // `fetchedAt` is deliberately NOT checked: it records when we retrieved the
+    // body, which is always after publication and never a fact about the story.
+    ctx.value.codeQuotes.forEach((quote, i) =>
+      notAfterKnownAt(
+        quote.atShaCommittedAt,
+        ['codeQuotes', i, 'atShaCommittedAt'],
+        `code quote ${quote.path}`,
+      ),
+    )
+    ctx.value.revealedLater.forEach((entry, i) => {
+      if (entry.at <= knownAt) {
+        ctx.issues.push({
+          code: 'custom',
+          input: ctx.value,
+          path: ['revealedLater', i, 'at'],
+          message: `revelation is dated at or before knownAt (${entry.at} <= ${knownAt}); it was knowable at publication`,
+        })
+      }
+    })
+
+    /*
+     * Uniqueness is enforced HERE, where the ids are minted, not on the article
+     * that cites them. {@link incidentRefIndex} is a Map: two colliding entries
+     * silently collapse into one, after which two aftermath citations pointing at
+     * different claims would both "resolve" to the survivor.
+     */
+    const seen = new Map<string, number>()
+    ctx.value.revealedLater.forEach((entry, i) => {
+      const ref = revealedRefFor(entry)
+      const first = seen.get(ref)
+      if (first === undefined) {
+        seen.set(ref, i)
+        return
+      }
+      ctx.issues.push({
+        code: 'custom',
+        input: ctx.value,
+        path: ['revealedLater', i],
+        message: `duplicate revealed id ${ref}, already minted by revealedLater[${first}]`,
+      })
+    })
+  })
 
 /** One of the five content-addressed id forms; parsed by {@link parseFactRef}, never by an index. */
 export const FactRef = z.string().min(1)
@@ -144,7 +231,7 @@ const Block = z.discriminatedUnion('type', [
  * lede exemption, so it is checked here.
  */
 export const Article = z
-  .object({
+  .strictObject({
     incidentId: Slug,
     lang: z.enum(['en']),
     persona: z.enum(['desk']),
@@ -181,6 +268,91 @@ export const Article = z
       })
     }
   })
+
+/**
+ * Binds the shape-only {@link Article} to one {@link Incident}. These rules need
+ * both halves, which is why they cannot live on {@link Article}: a ref that parses
+ * but points nowhere, or points at a commit where a code quote was required, is
+ * only detectable against the fact-set the article claims to cite.
+ *
+ * Zod runs a later `.check()` only when the earlier ones left the value clean, so
+ * one parse reports {@link Article}'s shape violation OR a pair violation, never
+ * both. Any violation is a FAIL, so that costs a second message, not a missed defect.
+ *
+ * @param incident - the fact-set the article claims to be about
+ * @returns an Article schema that additionally rejects unresolvable or miskinded refs
+ * @example articleSchemaFor(incident).safeParse(article).success // false when a ref points nowhere
+ */
+export function articleSchemaFor(incident: Incident) {
+  const index = incidentRefIndex(incident)
+  const datedFactCount = datedFacts(incident).length
+
+  return Article.check((ctx) => {
+    const article = ctx.value
+    const fail = (path: (string | number)[], message: string) =>
+      ctx.issues.push({ code: 'custom', input: article, path, message })
+
+    if (article.incidentId !== incident.id) {
+      fail(['incidentId'], `article is about ${article.incidentId}, not ${incident.id}`)
+    }
+
+    /** Resolves one ref against the fact-set and, when given, insists on its kind. */
+    const resolve = (ref: string, path: (string | number)[], expected?: FactRefParsed['kind']) => {
+      const kind = index.get(ref)
+      if (kind === undefined) {
+        fail(path, `${ref} does not resolve to any fact in ${incident.id}`)
+        return
+      }
+      if (expected !== undefined && kind !== expected) {
+        fail(path, `${ref} resolves to a ${kind} fact where a ${expected} fact was required`)
+      }
+    }
+
+    article.titleCites.forEach((ref, i) => resolve(ref, ['titleCites', i]))
+    article.dekCites.forEach((ref, i) => resolve(ref, ['dekCites', i]))
+
+    article.blocks.forEach((block, i) => {
+      switch (block.type) {
+        case 'prose':
+          block.sentences.forEach((sentence, j) =>
+            sentence.cites.forEach((ref, k) =>
+              resolve(ref, ['blocks', i, 'sentences', j, 'cites', k]),
+            ),
+          )
+          return
+        case 'codeQuote':
+          resolve(block.ref, ['blocks', i, 'ref'], 'code')
+          return
+        case 'personQuote': {
+          resolve(block.ref, ['blocks', i, 'ref'], 'discussion')
+          // A pull quote is a person's words, so it must cite the comment carrying
+          // them; `discussion:{n}` asserts only that the thread exists.
+          const parsed = parseFactRef(block.ref)
+          if (parsed?.kind === 'discussion' && parsed.commentId === undefined) {
+            fail(
+              ['blocks', i, 'ref'],
+              `${block.ref} names a thread, not the comment whose words are quoted`,
+            )
+          }
+          return
+        }
+        // The refless blocks carry no FactRef, so the resolution rules above cannot
+        // reach them; each needs the fact-set to hold its own precondition.
+        case 'diffBox':
+          if (incident.diff === null) {
+            fail(['blocks', i], 'diffBox rendered against an incident with no diff')
+          }
+          return
+        case 'timelineBox':
+          if (datedFactCount < 2) {
+            fail(['blocks', i], `timelineBox needs 2 dated facts, incident has ${datedFactCount}`)
+          }
+      }
+    })
+
+    article.aftermath.forEach((entry, i) => resolve(entry.ref, ['aftermath', i, 'ref'], 'revealed'))
+  })
+}
 
 export type Incident = z.infer<typeof Incident>
 export type Article = z.infer<typeof Article>

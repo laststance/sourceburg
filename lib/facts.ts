@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import type { Incident, Article } from './schema'
 
 /*
@@ -108,6 +110,29 @@ export function datedFacts(incident: Incident): DatedFact[] {
   return facts.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
 }
 
+/**
+ * Mints the `revealed:` id for one aftermath entry. Content-addressed over the
+ * claim itself, so editing `what` repoints the citation instead of silently
+ * changing what an already-published `[n]` asserts.
+ *
+ * @param entry - one {@link Incident} `revealedLater` element
+ * @returns `revealed:{evidenceKind}:{evidenceKey}:{12-hex digest of at + what}`
+ * @example revealedRefFor({ at: '2026-08-07T10:05:00Z', what: 'refixed', evidence: { kind: 'commit', sha } })
+ *   // => 'revealed:commit:5e9e0245…:1f3c9a02bb71'
+ */
+export function revealedRefFor(entry: Incident['revealedLater'][number]): string {
+  const key =
+    entry.evidence.kind === 'commit'
+      ? entry.evidence.sha
+      : entry.evidence.commentId === undefined
+        ? String(entry.evidence.number)
+        : `${entry.evidence.number}#${entry.evidence.commentId}`
+  // NUL separator: no ISO timestamp or claim text can contain it, so two
+  // different (at, what) pairs cannot concatenate into the same digest input.
+  const digest = createHash('sha256').update(`${entry.at}\0${entry.what}`).digest('hex').slice(0, 12)
+  return `revealed:${entry.evidence.kind}:${key}:${digest}`
+}
+
 /** Ids the incident can actually resolve, keyed by the ref string a citation would use. */
 export function incidentRefIndex(incident: Incident): Map<string, FactRefParsed['kind']> {
   const index = new Map<string, FactRefParsed['kind']>()
@@ -121,5 +146,8 @@ export function incidentRefIndex(incident: Incident): Map<string, FactRefParsed[
   for (const quote of incident.codeQuotes) {
     index.set(`code:${quote.atSha}:${quote.path}:${quote.startLine}-${quote.endLine}`, 'code')
   }
+  // The aftermath belongs in the index too: without it every aftermath citation
+  // would resolve to nothing and the article could never carry an aftermath.
+  for (const entry of incident.revealedLater) index.set(revealedRefFor(entry), 'revealed')
   return index
 }
