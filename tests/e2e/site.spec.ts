@@ -7,7 +7,7 @@ import { articleHref } from '../../lib/links'
 import type { Published } from '../../lib/publish'
 
 /*
- * The eight reader paths, run at all three viewports by the config's projects.
+ * The nine reader paths, run at all three viewports by the config's projects.
  *
  * Asserted against the REAL published content rather than a fixture, for the same
  * reason the render layer's four layout bugs only appeared once incident #1 was on
@@ -162,6 +162,39 @@ test.describe('a reader can retype the page without losing it', () => {
 
     // Assert
     expect(scan.violations).toEqual([])
+  })
+
+  test('has the larger size already applied on a returning reader first paint', async ({ page }) => {
+    // Arrange — the browser of somebody who chose `Larger` on an earlier visit. The key is
+    // written out here rather than imported: renaming it in `lib/constants.ts` strands every
+    // preference already sitting in a real reader's browser, and this failing is how that
+    // gets noticed.
+    await page.addInitScript(() => localStorage.setItem('sourceburg:reading-size', 'larger'))
+    // Every JS chunk refused, so React never hydrates and `ReadingControls`'s effect never
+    // runs. What is left applying the preference is the inline script in `<head>` and nothing
+    // else. The stylesheet is a `.css` chunk under the same directory and still goes through.
+    let refusedChunks = 0
+    await page.route('**/_next/static/chunks/*.js', (route) => {
+      refusedChunks += 1
+      return route.abort()
+    })
+
+    // Act
+    await page.goto(articleHref((await newest()).incident))
+    const scale = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--reading-scale').trim(),
+    )
+    const proseSize = await page
+      .locator('.column-text')
+      .first()
+      .evaluate((element) => parseFloat(getComputedStyle(element).fontSize))
+
+    // Assert — the reload test above passes whether or not the inline script exists, because
+    // by the time it measures, React has had its turn. This is the one that fails if the
+    // script stops running, which is a reader watching the article resize itself on load.
+    expect(refusedChunks).toBeGreaterThan(0)
+    expect(scale).toBe('1.25')
+    expect(proseSize).toBe(20)
   })
 })
 
