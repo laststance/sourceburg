@@ -216,10 +216,16 @@ test.describe('a reader can retype the page without losing it', () => {
     await expect(page.getByRole('radio', { name: 'Larger' })).toBeChecked()
     const writes = await page.evaluate(() => window.__attributeWrites)
 
-    // Assert — an effect keyed on the rendered value fired first with the SERVER snapshot,
-    // so it wrote `regular` over what the pre-paint script had set and restored `larger` a
-    // render later, on every single load. It never painted in between, because the two are
-    // one main-thread task, but it was a flash waiting for React to yield once.
+    // Assert — the first two writes are the inline script's, in the order `app/layout.tsx`
+    // sets them. Asserting them is what stops the two negative lines below passing on an
+    // empty array: delete the script, or let the `setAttribute` patch stop matching, and
+    // `writes` is `[]` while both `not.toContain` stay trivially true. The checked radio
+    // above cannot stand in for this — it renders from storage, never from the attribute.
+    expect(writes.slice(0, 2)).toEqual(['data-reading-font=sans', 'data-reading-size=larger'])
+    // An effect keyed on the rendered value fired first with the SERVER snapshot, so it
+    // wrote `regular` over what the pre-paint script had set and restored `larger` a render
+    // later, on every single load. It never painted in between, because the two are one
+    // main-thread task, but it was a flash waiting for React to yield once.
     expect(writes).not.toContain('data-reading-size=regular')
     expect(writes).not.toContain('data-reading-font=serif')
   })
