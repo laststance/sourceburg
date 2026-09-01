@@ -1,69 +1,63 @@
-import Image from "next/image";
+import { Masthead } from '../components/Masthead'
+import { FrontPageLead } from '../components/ArticleView'
+import { CONTENT_DIR, readAllPublished } from '../lib/content'
+import { deriveHomepageLayout } from '../lib/homepage'
+import { articleHref } from '../lib/links'
 
-export default function Home() {
+import Link from 'next/link'
+
+import type { Metadata } from 'next'
+
+/*
+ * `/` is composed for the number of published incidents, and N = 0 is a normal state.
+ * A dry news day is a documented success path, so the launch screen and the empty
+ * screen are the same screen. `deriveHomepageLayout` owns the branch; this file
+ * renders what it is handed.
+ */
+
+export async function generateMetadata(): Promise<Metadata> {
+  const layout = deriveHomepageLayout(await readAllPublished(CONTENT_DIR))
+  // Canonical follows whether the lead's BODY is on this page, not N. The fold does
+  // not change as N grows, so at every N >= 1 the duplicate is declared, not accidental.
+  return { alternates: { canonical: layout.canonical } }
+}
+
+export default async function HomePage() {
+  const layout = deriveHomepageLayout(await readAllPublished(CONTENT_DIR))
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <>
+      <Masthead />
+      <main id="main">
+        {layout.kind === 'empty' ? (
+          <div className="mx-auto flex max-w-[1400px] flex-col items-start gap-6 px-4 py-20 sm:px-6">
+            <p className="font-display text-5xl leading-none tracking-tight uppercase sm:text-7xl">No news today</p>
+            <p className="font-serif text-lg">Nothing has been verified for publication yet.</p>
+            <a href="/feed.xml" className="permalink font-mono text-sm underline">
+              Atom feed · /feed.xml
+            </a>
+          </div>
+        ) : (
+          <>
+            <FrontPageLead incident={layout.lead.incident} article={layout.lead.article} />
+            {layout.rest.length === 0 ? null : (
+              // Single-column slots below the fold. No card grid, no image tiles.
+              <section className="mx-auto max-w-[1400px] border-t border-rule px-4 py-6 sm:px-6">
+                <ol className="flex flex-col gap-5">
+                  {layout.rest.map((entry) => (
+                    <li key={entry.incident.id} className="border-t border-rule pt-4 first:border-t-0 first:pt-0">
+                      <Link href={articleHref(entry.incident)} className="font-display text-2xl uppercase underline">
+                        {entry.article.title}
+                      </Link>
+                      <p className="mt-1 max-w-[60ch] font-serif">{entry.article.dek}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+          </>
+        )}
       </main>
-    </div>
-  );
+    </>
+  )
 }

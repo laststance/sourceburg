@@ -18,3 +18,6 @@ export const EXCERPTABLE_LICENSES = [
   'MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC',
   'GPL-2.0', 'GPL-3.0', 'AGPL-3.0', 'LGPL-2.1', 'LGPL-3.0', 'MPL-2.0',
 ] as const
+
+/** The production origin, no trailing slash. Absolute URLs in the feed need one. */
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sourceburg.vercel.app'
