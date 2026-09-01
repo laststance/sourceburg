@@ -132,3 +132,36 @@ reasoning lives in DESIGN.md under the never-rendered list. Test paths P50 and P
 
 **Depends on / blocked by:** Nothing. It resolves the first time an article is
 written against a real repo.
+
+---
+
+## 5. `spdxLicense` is an unverified fact
+
+**What:** Give the probe vocabulary a way to check `incident.repo.spdxLicense` and
+`incident.repo.defaultBranch` against GitHub, the way every sha, date, and quoted
+line is already checked.
+
+**Why:** The license policy is a real gate: `pureRules` refuses to publish a code
+excerpt from a repo whose SPDX id is not in `EXCERPTABLE_LICENSES`. That gate
+currently reads a string nothing verifies. `bin/collect.ts` fetches it from
+`gh api repos/{nwo}`, so a collected fact-set is honest — but a fact-set is a
+committed artifact that a later run parses, and an edited `spdxLicense: "MIT"` on
+a proprietary repo would pass every probe and publish the excerpt. It is the one
+fact in the schema with a policy attached and no probe behind it.
+
+**Pros:** Closes the last gap between "every fact is verified" and what the code
+actually does. `commandFor` already speaks `gh api`; the new case is two lines.
+
+**Cons:** Touches `ProbeSpec`, `probeId`, `commandFor`, `plan()`, `verify()`, and
+their tests — the four files step 4 locked down. `plan()`'s "every fact
+contributes a probe" test has to grow a case, and the rule needs a verdict for a
+repo with no license at all (GitHub returns `null`, and `NOASSERTION` is not the
+same as unlicensed).
+
+**Context:** Deliberately deferred while building the collector (step 6, 2026-09-01).
+A `ghRepo` probe kind that `plan()` never emits would be dead vocabulary, so the
+collector calls `gh api repos/{nwo}` directly and says so in its header comment.
+The reasoning is recorded there and here rather than in a code comment nobody
+greps.
+
+**Depends on / blocked by:** Nothing. Cheapest to do next time `plan()` is open.
