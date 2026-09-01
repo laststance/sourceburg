@@ -436,11 +436,27 @@ export function pureRules(
     }
     // Strictly greater, not >=: an unchanged updatedAt would tell every feed
     // reader nothing happened while the body changed underneath them.
-    if (article.updatedAt <= previous.updatedAt) {
+    //
+    // Against `articleUpdatedAt`, never against `updatedAt`. Both are on the
+    // manifest and they run on different clocks: `updatedAt` is wall clock at
+    // publish, which is always later than the event time the article carries, so
+    // the earlier version of this rule failed every republish that ever reached
+    // it. See {@link PreviouslyPublished}.
+    const previousArticleUpdatedAt: string | undefined = previous.articleUpdatedAt
+    if (previousArticleUpdatedAt === undefined) {
+      // A manifest written before the field existed. Named rather than skipped:
+      // a safety rule that quietly stops running is worse than one that fails.
       findings.push(
         fail(
           'updatedAt strictly increases',
-          `was ${previous.updatedAt}, now ${article.updatedAt}`,
+          `the published manifest has no articleUpdatedAt, so there is nothing in event time to compare ${article.updatedAt} against`,
+        ),
+      )
+    } else if (article.updatedAt <= previousArticleUpdatedAt) {
+      findings.push(
+        fail(
+          'updatedAt strictly increases',
+          `was ${previousArticleUpdatedAt}, now ${article.updatedAt}`,
         ),
       )
     }

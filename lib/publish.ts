@@ -196,6 +196,10 @@ export async function publish(
       identity,
       publishedAt: previous?.publishedAt ?? article.publishedAt,
       updatedAt: options.updatedAt,
+      // The article's own value, kept beside the pipeline stamp rather than
+      // instead of it: the monotonic rule needs event time, the feed needs
+      // live time, and one field cannot honestly be both.
+      articleUpdatedAt: article.updatedAt,
     }
     await swapPointer(dir, manifest)
     return manifest

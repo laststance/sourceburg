@@ -15,11 +15,25 @@ import type { Incident } from '../schema'
  */
 export type IdentityTuple = { nameWithOwner: string; id: string; anchorSha: string }
 
-/** The record of a prior publication, or `null` on first publish. */
+/**
+ * The record of a prior publication, or `null` on first publish.
+ *
+ * TWO CLOCKS, and they are not interchangeable. `publishedAt` and
+ * `articleUpdatedAt` are EVENT time — they come from the fact-set's `knownAt`, so
+ * they say when the story was true. `updatedAt` is PIPELINE time — wall clock at
+ * publish, so it says when this version went live, which is what a feed reader
+ * diffs against. Comparing one against the other is always wrong in the same
+ * direction, because wall clock is always later than the event it records; that
+ * is TODOS #9, which killed republishing until `articleUpdatedAt` existed to
+ * give the monotonic rule something in its own currency to compare against.
+ */
 export type PreviouslyPublished = {
   identity: IdentityTuple
   publishedAt: string
+  /** Pipeline time: when this version went live. Feeds read this. */
   updatedAt: string
+  /** Event time: the article's own `updatedAt`. The monotonic rule reads this. */
+  articleUpdatedAt: string
 }
 
 export function identityOf(incident: Incident): IdentityTuple {

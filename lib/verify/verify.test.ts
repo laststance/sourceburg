@@ -354,10 +354,15 @@ describe('the license caps hold at their exact boundary', () => {
 })
 
 describe('republishing cannot rewrite what was already announced', () => {
+  // The two clocks carry DIFFERENT values on purpose. `updatedAt` is wall clock at
+  // publish and runs months ahead of the event time the article carries; a fixture
+  // that sets both from one string is what let TODOS #9 ship, because it made the
+  // rule look right while it compared event time against pipeline time.
   const previous = {
     identity: { nameWithOwner: REPO, id: 'rhf-fieldarray-revert', anchorSha: ANCHOR },
     publishedAt: '2026-09-01T00:00:00Z',
-    updatedAt: '2026-09-01T00:00:00Z',
+    updatedAt: '2027-03-14T09:12:44.318Z',
+    articleUpdatedAt: '2026-09-01T00:00:00Z',
   }
 
   it('fails when publishedAt moves on a regeneration', () => {
@@ -378,6 +383,46 @@ describe('republishing cannot rewrite what was already announced', () => {
     const article = articleFixture(revealedRefFor(incident.revealedLater[0]))
     // Act
     const rules = pureRules(incident, article, previous).map((f) => f.rule)
+    // Assert
+    expect(rules).toContain('updatedAt strictly increases')
+  })
+
+  it('lets a regeneration through when its updatedAt moved, even though the live stamp is later still', () => {
+    // Arrange — the case that was impossible before TODOS #9 was fixed. The
+    // manifest's live stamp is 2027; the article's event time is 2026-09-02, one
+    // day past the previous article's. Against the live stamp this looks like
+    // going backwards, and every republish failed on it.
+    const incident = incidentFixture()
+    const article = articleFixture(revealedRefFor(incident.revealedLater[0]), {
+      updatedAt: '2026-09-02T00:00:00Z',
+    })
+
+    // Act
+    const rules = pureRules(incident, article, previous).map((finding) => finding.rule)
+
+    // Assert
+    expect(rules).not.toContain('updatedAt strictly increases')
+  })
+
+  it('fails a manifest published before articleUpdatedAt existed, rather than skipping the rule', () => {
+    // Arrange — an old manifest has no event-time field, so there is nothing to
+    // compare against. Silence here would retire a safety rule without saying so.
+    const incident = incidentFixture()
+    const article = articleFixture(revealedRefFor(incident.revealedLater[0]), {
+      updatedAt: '2026-09-02T00:00:00Z',
+    })
+    // The cast is the point, not a shortcut: an old manifest is untyped JSON off
+    // disk, which `readManifest` also casts, and a required field cannot be absent
+    // in the type system while being absent in the file.
+    const beforeTheFieldExisted = {
+      identity: previous.identity,
+      publishedAt: previous.publishedAt,
+      updatedAt: previous.updatedAt,
+    } as typeof previous
+
+    // Act
+    const rules = pureRules(incident, article, beforeTheFieldExisted).map((finding) => finding.rule)
+
     // Assert
     expect(rules).toContain('updatedAt strictly increases')
   })

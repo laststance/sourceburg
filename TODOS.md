@@ -341,9 +341,9 @@ already runs at all three viewports — not a new spec file.
 
 ---
 
-## 9. The manifest keeps two clocks under one name, and it has killed republishing
+## 9. The manifest keeps two clocks under one name, and it had killed republishing
 
-**Status:** open, real, shipped. Found on 2026-09-01 by re-running `pnpm verify`
+**Status:** CLOSED 2026-09-01, option (c). Was: open, real, shipped. Found on 2026-09-01 by re-running `pnpm verify`
 against the published article at the end of step 10 — not by any test, because
 every fixture sets both fields from the same string, and the bug lives exactly
 in the gap between what the fixtures do and what the pipeline does.
@@ -414,5 +414,31 @@ Whichever is chosen, the test that would have caught this is the same: a
 republish fixture whose article `updatedAt` and manifest `updatedAt` come from
 **different** sources, because every existing fixture sets them from one string.
 
-**Depends on / blocked by:** a decision on (a)/(b)/(c). The code change is
-minutes in every case.
+**Chose (c), and (a) and (b) were not close.** (a) blocks a prose-only
+regeneration, which the skill's own description promises ("write, draft, or
+*regenerate*"). (b) moves the check behind the gate, so a wrong fact arrives as a
+thrown crash — exit 2, INDETERMINATE — and this pipeline's whole three-valued
+verdict exists to keep "somebody fabricated a value" from collapsing into "a
+probe could not run". The objection to (c) turned out not to apply: `f25a4d8`
+collapsed *duplicate re-declarations of the same four fields*, and a second clock
+is a second quantity, not a duplicate of the first.
+
+**Shipped:** `PreviouslyPublished` gains `articleUpdatedAt` (event time) beside
+`updatedAt` (pipeline time), each documented with which reader it serves;
+`publish()` records it; the monotonic rule compares event time to event time; a
+manifest written before the field existed FAILs by name rather than skipping the
+rule, because a safety rule that quietly stops running is worse than one that
+fires. The single on-disk manifest was backfilled from the article it points at.
+
+**Proven on real data, not only in fixtures.** A regeneration whose event time is
+2026-06-01 against a manifest whose live stamp is 2026-09-01 — the exact shape
+that was permanently impossible — now PASSes at 15 probes against the real clone.
+Verifying the published article as a republish candidate still FAILs, now for the
+right reason: `was 2026-05-17T23:41:25Z, now 2026-05-17T23:41:25Z`, equal event
+time, no new version to announce. Both new rules mutation-checked.
+
+**The fixture was the bug's hiding place, and it changed too.** `previous` in
+`lib/verify/verify.test.ts` now carries a live stamp months ahead of its event
+time. Every earlier fixture set both from one string, which is precisely why 208
+green tests said nothing about a rule that could only ever compare two different
+clocks.
