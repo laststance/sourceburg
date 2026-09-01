@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { Article, Incident } from '../lib/schema'
 import { execute } from '../lib/verify/execute'
 import { plan } from '../lib/verify/plan'
+import { preflight } from '../lib/verify/preflight'
 import { exitCodeFor } from '../lib/verify/result'
 import { verify } from '../lib/verify/verify'
 
@@ -37,14 +38,28 @@ async function main(): Promise<number> {
     ? (JSON.parse(await readFile(previousPath, 'utf8')) as PreviouslyPublished)
     : null
 
+  /** Reports one result the same way whether it came from preflight or from verify. */
+  const report = (result: { verdict: string; findings: { verdict: string; rule: string; detail: string }[] }, probeCount: number) => {
+    for (const finding of result.findings) {
+      process.stdout.write(`${finding.verdict}  ${finding.rule}\n        ${finding.detail}\n`)
+    }
+    process.stdout.write(`${result.verdict} (${probeCount} probes, ${result.findings.length} findings)\n`)
+  }
+
+  // Preflight runs BEFORE any fact is probed. A shallow clone or a mismatched
+  // origin makes every probe below it meaningless, so reporting them together
+  // would bury the one finding that explains the rest.
+  const clone = await preflight(incident, repoDir)
+  if (clone.verdict !== 'PASS') {
+    report(clone, 0)
+    return exitCodeFor(clone.verdict)
+  }
+
   const requests = plan(incident)
   const probes = await execute(requests, { repoDir, cache: new Map() })
   const result = verify(incident, article, previous, probes)
 
-  for (const finding of result.findings) {
-    process.stdout.write(`${finding.verdict}  ${finding.rule}\n        ${finding.detail}\n`)
-  }
-  process.stdout.write(`${result.verdict} (${requests.length} probes, ${result.findings.length} findings)\n`)
+  report(result, requests.length)
   return exitCodeFor(result.verdict)
 }
 
