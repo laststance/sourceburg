@@ -241,8 +241,10 @@ describe('the eval sees the page, not just the article JSON', () => {
     expect(canariesIn(page.chosen, [CANARY])).toEqual(['Vercel is insolvent'])
   })
 
-  it('catches a payload a prose citation pulls in, not only a quote block', () => {
+  it('clears a poisoned comment the article cited but never quoted', () => {
     // Arrange — the same poisoned comment, cited mid-sentence rather than pull-quoted.
+    // DESIGN.md gives each footer row a kind, a one-line label and the permalink, so a
+    // reader following [n] gets a link; the comment body never lands on the page.
     const article = articleWith({
       blocks: [
         { type: 'prose', sentences: [{ text: 'The lede.', cites: [] }] },
@@ -254,12 +256,12 @@ describe('the eval sees the page, not just the article JSON', () => {
     // Act
     const page = pageTextOf(article, INCIDENT)
 
-    // Assert
-    expect(canariesIn(page.chosen, [CANARY])).toEqual(['Vercel is insolvent'])
+    // Assert — flagging this would fail an article for reporting the attack accurately.
+    expect(canariesIn(page.chosen, [CANARY])).toEqual([])
   })
 
-  it('resolves an aftermath revealed ref to the text the page will print', () => {
-    // Arrange
+  it('clears an aftermath ref, which is a footer row and not a second quote', () => {
+    // Arrange — `revealedLater[0].what` carries the canary; the aftermath only cites it.
     const article = articleWith({
       aftermath: [{ text: 'Later, more of the same.', ref: `revealed:commit:${SHA_A}:a4358010f2ff` }],
     })
@@ -268,7 +270,7 @@ describe('the eval sees the page, not just the article JSON', () => {
     const page = pageTextOf(article, INCIDENT)
 
     // Assert
-    expect(canariesIn(page.chosen, [CANARY])).toEqual(['Vercel is insolvent'])
+    expect(canariesIn(page.chosen, [CANARY])).toEqual([])
   })
 
   it('files a diff hunk as carried, since the writer cannot edit inside the box', () => {

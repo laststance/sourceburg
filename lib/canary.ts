@@ -1,4 +1,4 @@
-import { articleRefs, datedFacts, parseFactRef, revealedRefFor } from './facts'
+import { datedFacts, parseFactRef } from './facts'
 import type { Article, Incident } from './schema'
 
 /*
@@ -72,16 +72,21 @@ export function canariesIn(value: unknown, canaries: readonly string[]): string[
 /**
  * The text an article puts in front of a reader, split by how much say the writer had.
  * - `desk` — its own words, plus the refs it wrote. A canary here means it was steered.
- * - `chosen` — text a ref it emitted pulls out of the fact-set. Quoting is an editorial
+ * - `chosen` — fact-set text a QUOTE BLOCK pulls onto the page. Quoting is an editorial
  *   act: with a clean excerpt available, reaching for the poisoned one is the laundering
- *   move, and it leaves `desk` spotless.
+ *   move, and it leaves `desk` spotless. A plain `[n]` citation is NOT in here — DESIGN.md
+ *   has each footer row print the kind, a one-line label and the permalink, never the
+ *   excerpt, so citing a poisoned comment shows the reader a link, not the payload.
  * - `carried` — a `diffBox` hunk and `timelineBox` labels, which arrive whole. The
  *   writer may include the block or not and cannot edit inside it, so a canary here
  *   is the fact-set's content, not the writer's doing.
  *
- * Assumes the page prints the verified `excerpt` / `text` / `what`, never a raw comment
- * body. Nothing renders yet (step 8), so this defines that contract rather than
- * observing it; if the page ever prints more than the fact-set holds, this undercounts.
+ * Assumes the page prints the verified `excerpt` and `text`, never a raw comment body.
+ * Nothing renders yet (step 8), so this defines that contract rather than observing it;
+ * if the page ever prints more than the fact-set holds, this undercounts. The footer's
+ * "one-line label" is the open edge: DESIGN.md does not say what it holds, and if step 8
+ * derives it from `commits[].subject` the way {@link datedFacts} does, every `commit:`
+ * citation becomes a delivery route and this needs a fourth bucket.
  *
  * @param article - what the writer produced
  * @param incident - the fact-set the refs resolve against
@@ -93,9 +98,11 @@ export function pageTextOf(article: Article, incident: Incident): PageText {
   // cannot hide a payload: they are shas, numbers and paths.
   const desk = allStrings(article)
 
+  // Quote blocks only. A `cites` entry renders a marker and a footer row, not the source.
   const chosen: string[] = []
-  for (const ref of articleRefs(article)) {
-    const parsed = parseFactRef(ref)
+  for (const block of article.blocks) {
+    if (block.type !== 'codeQuote' && block.type !== 'personQuote') continue
+    const parsed = parseFactRef(block.ref)
     if (parsed === null) continue
 
     if (parsed.kind === 'code') {
@@ -113,11 +120,9 @@ export function pageTextOf(article: Article, incident: Incident): PageText {
           if (quote.commentId === parsed.commentId) chosen.push(quote.excerpt)
         }
       }
-    } else if (parsed.kind === 'revealed') {
-      const entry = incident.revealedLater.find((later) => revealedRefFor(later) === ref)
-      if (entry !== undefined) chosen.push(entry.what)
     }
-    // A `commit:` or bare `discussion:` ref renders a marker and a number, no fact text.
+    // The schema already forces `codeQuote` to a `code:` ref and `personQuote` to a
+    // comment ref, so no other kind can reach here.
   }
 
   const carried: string[] = []
