@@ -7,7 +7,7 @@ import { articleHref } from '../../lib/links'
 import type { Published } from '../../lib/publish'
 
 /*
- * The nine reader paths, run at all three viewports by the config's projects.
+ * The ten reader paths, run at all three viewports by the config's projects.
  *
  * Asserted against the REAL published content rather than a fixture, for the same
  * reason the render layer's four layout bugs only appeared once incident #1 was on
@@ -162,6 +162,27 @@ test.describe('a reader can retype the page without losing it', () => {
 
     // Assert
     expect(scan.violations).toEqual([])
+  })
+
+  test('picks up a typeface chosen in another tab without a reload', async ({ page, context }) => {
+    // Arrange — two articles open at once, which is how a reader works through a paper.
+    const href = articleHref((await newest()).incident)
+    await page.goto(href)
+    const otherTab = await context.newPage()
+    await otherTab.goto(href)
+
+    // Act — the choice is made in the FIRST tab only.
+    await page.getByText('Reading options').click()
+    await page.getByRole('radio', { name: 'Sans-serif' }).check()
+
+    // Assert — `storage` fires only in the tabs that did NOT write, so this is the path the
+    // in-memory snapshot cache would otherwise strand: prose still serif in the other tab
+    // until a hard reload.
+    await expect(otherTab.locator('.column-text').first()).toHaveCSS('font-family', /system-ui/)
+    // Its menu has to agree too. A stale dot beside live prose is its own bug.
+    await otherTab.getByText('Reading options').click()
+    await expect(otherTab.getByRole('radio', { name: 'Sans-serif' })).toBeChecked()
+    await otherTab.close()
   })
 
   test('has the larger size already applied on a returning reader first paint', async ({ page }) => {

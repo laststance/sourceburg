@@ -36,7 +36,11 @@ import type { ReadingFont, ReadingSize } from '../lib/constants'
  * this reader chose", which is exactly the split the hook exists for.
  */
 
-/** Notified after a choice changes. localStorage fires no event in the tab that wrote it. */
+/**
+ * Notified after a choice changes. localStorage fires no event in the tab that wrote it,
+ * so this tab's own writes go through {@link remember}; another tab's arrive as `storage`
+ * and go through {@link adoptAnotherTabsChoice}.
+ */
 const listeners = new Set<() => void>()
 
 /*
@@ -72,10 +76,34 @@ function storedChoice<Value extends string>(
   return options.find((option) => option.value === stored)?.value ?? fallback
 }
 
+/**
+ * Adopts a choice made in ANOTHER tab. `storage` fires only in the tabs that did not write,
+ * which is exactly the case the in-memory cache below would otherwise strand: without this,
+ * a reader with two articles open changes the typeface in one and the other keeps the old
+ * one, and its radios keep the old dot, until a hard reload.
+ * @param event - the browser's `storage` event; `key` is null when storage was cleared
+ * @returns nothing; it drops the caches so the next snapshot re-reads, then re-renders
+ * @example // tab A: chooseFont('sans')  ->  tab B re-renders in sans
+ */
+function adoptAnotherTabsChoice(event: StorageEvent): void {
+  // Some other key on this origin, so nothing here changed.
+  if (event.key !== null && event.key !== READING_FONT_KEY && event.key !== READING_SIZE_KEY) return
+  chosenFont = null
+  chosenSize = null
+  for (const listener of listeners) listener()
+}
+
 /** Registers a re-render callback. Returned to React, which calls it to unsubscribe. */
 function subscribe(onStoreChange: () => void): () => void {
+  // The first subscriber opens the cross-tab feed and the last one closes it. Registering
+  // the same function twice is a no-op in the browser, but removing it once would cut off
+  // the sibling subscriber still mounted, so the count is what decides rather than the call.
+  if (listeners.size === 0) window.addEventListener('storage', adoptAnotherTabsChoice)
   listeners.add(onStoreChange)
-  return () => listeners.delete(onStoreChange)
+  return () => {
+    listeners.delete(onStoreChange)
+    if (listeners.size === 0) window.removeEventListener('storage', adoptAnotherTabsChoice)
+  }
 }
 
 function fontSnapshot(): ReadingFont {
