@@ -159,6 +159,31 @@ describe('running real git tells a wrong fact from a broken clone', () => {
     expect(result.status).toBe('ok')
   })
 
+  it('returns a committer date already normalized to UTC, so the schema and git agree on one format', async () => {
+    // Arrange: a commit authored at +10:00, the form `git log --format=%cI` prints
+    const tzRepo = mkdtempSync(join(tmpdir(), 'sourceburg-tz-'))
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', tzRepo, ...args], {
+        encoding: 'utf8',
+        env: { ...process.env, GIT_COMMITTER_DATE: '2026-05-18T09:41:25+10:00', GIT_AUTHOR_DATE: '2026-05-18T09:41:25+10:00' },
+      })
+    git('init', '-q', '-b', 'main')
+    git('config', 'user.email', 'test@example.invalid')
+    git('config', 'user.name', 'Test')
+    writeFileSync(join(tzRepo, 'a.ts'), 'x\n')
+    git('add', 'a.ts')
+    git('commit', '-q', '-m', 'offset commit')
+    const sha = git('rev-parse', 'HEAD').trim()
+    // Act
+    const [result] = await execute(
+      [{ id: 'd', covers: [], kind: 'gitCommitDate' as const, sha }],
+      { repoDir: tzRepo },
+    )
+    // Assert: the same instant, in the only format the schema accepts
+    expect(result.status === 'ok' && result.stdout.trim()).toBe('2026-05-17T23:41:25Z')
+    rmSync(tzRepo, { recursive: true, force: true })
+  })
+
   it('returns absent for a fabricated sha, so the verifier can call it a FAIL', async () => {
     // Arrange
     const request = { id: 'd', covers: [], kind: 'gitCommitDate' as const, sha: 'deadbeef'.repeat(5) }

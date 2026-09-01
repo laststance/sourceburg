@@ -83,8 +83,20 @@ export type ExecuteOptions = {
 export function commandFor(spec: ProbeSpec, repoDir: string): { file: string; args: string[] } {
   switch (spec.kind) {
     case 'gitCommitDate':
-      // `^{commit}` peels and asserts the type in one call, so a blob sha fails here.
-      return { file: 'git', args: ['-C', repoDir, 'show', '-s', '--format=%cI', `${spec.sha}^{commit}`] }
+      /*
+       * `^{commit}` peels and asserts the type in one call, so a blob sha fails here.
+       *
+       * `--date=iso-strict-local` with TZ=UTC (set in {@link runOne}) is what makes
+       * git print `2026-05-17T23:41:25Z` instead of `2026-05-18T09:41:25+10:00`.
+       * The schema stores UTC only, and comparing those two strings fails on every
+       * single date while both name the same instant — a timezone bug that reads
+       * exactly like a logic bug. Normalizing at the source beats reformatting the
+       * output afterwards, because there is then no second format to get wrong.
+       */
+      return {
+        file: 'git',
+        args: ['-C', repoDir, 'show', '-s', '--date=iso-strict-local', '--format=%cd', `${spec.sha}^{commit}`],
+      }
     case 'gitBlob':
       // The BLOB form of `git show`. `git show <sha>` would print a commit header
       // carrying author email addresses, which are on the never-rendered list.
@@ -141,7 +153,12 @@ async function runOne(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const { stdout } = await run(file, args, { timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 })
+      const { stdout } = await run(file, args, {
+        timeout: timeoutMs,
+        maxBuffer: 32 * 1024 * 1024,
+        // Every git date comes back UTC-normalized; see the gitCommitDate case.
+        env: { ...process.env, TZ: 'UTC' },
+      })
       return { id: request.id, status: 'ok', stdout }
     } catch (thrown) {
       const stderr = stderrOf(thrown)
