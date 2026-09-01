@@ -71,6 +71,13 @@ still waits for a page to measure.
 **Depends on / blocked by:** The article page build (design doc Next Steps, broadsheet
 front page + article page).
 
+**Update 2026-09-01 — the reading menu did not spend any of this.** A reader can
+now switch to a sans face, and the sans face is the system stack rather than a
+fourth self-hosted family: zero bytes, no swap, budget untouched. The alternative
+on the table was Source Sans 3 at roughly +40KB, which would have made four
+families and five files and blown the ceiling below for a preference the OS font
+already serves. See DESIGN.md § Typography → *The reader's own two knobs*.
+
 ---
 
 ## 3. `gh search` fallback for repos with no search index

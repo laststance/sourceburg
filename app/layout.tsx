@@ -1,6 +1,14 @@
 import { Anton, JetBrains_Mono, Source_Serif_4 } from 'next/font/google'
 
 import './globals.css'
+import {
+  READING_FONT_ATTR,
+  READING_FONT_DEFAULT,
+  READING_FONT_KEY,
+  READING_SIZE_ATTR,
+  READING_SIZE_DEFAULT,
+  READING_SIZE_KEY,
+} from '../lib/constants'
 
 import type { Metadata } from 'next'
 
@@ -32,6 +40,27 @@ const jetBrainsMono = JetBrains_Mono({
   preload: false,
 })
 
+/*
+ * The reader's stored choice, applied while the browser is still PARSING, which is the
+ * only moment early enough. `useLayoutEffect` runs before paint but after hydration, and
+ * on a statically prerendered page the browser paints the HTML long before React loads —
+ * a reader on `larger` would watch the article resize itself on every navigation, and
+ * this site's own rule is that nothing animates.
+ *
+ * This is the one `dangerouslySetInnerHTML` in the tree, and `lib/highlight.test.ts`
+ * fails the build if a second appears. The distinction it enforces: this string is a
+ * frozen literal built from two constants in this repo, and it writes what it reads into
+ * an ATTRIBUTE, where an unknown value matches no CSS rule and falls back to the design.
+ * A renderer handing fact-set text to the same prop would be markup, which is the thing
+ * that must never happen.
+ */
+const READING_PREFERENCE_SCRIPT =
+  `(function(){try{var root=document.documentElement;` +
+  `var font=localStorage.getItem(${JSON.stringify(READING_FONT_KEY)});` +
+  `if(font)root.setAttribute(${JSON.stringify(READING_FONT_ATTR)},font);` +
+  `var size=localStorage.getItem(${JSON.stringify(READING_SIZE_KEY)});` +
+  `if(size)root.setAttribute(${JSON.stringify(READING_SIZE_ATTR)},size)}catch(e){}})()`
+
 export const metadata: Metadata = {
   title: { default: 'sourceburg', template: '%s · sourceburg' },
   description: 'Every fact machine-verified against its source.',
@@ -39,7 +68,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${anton.variable} ${sourceSerif.variable} ${jetBrainsMono.variable}`}>
+    // The two attributes below are the DEFAULT, and the script rewrites them before React
+    // ever sees the DOM, so the mismatch React would otherwise report is expected here.
+    <html
+      lang="en"
+      className={`${anton.variable} ${sourceSerif.variable} ${jetBrainsMono.variable}`}
+      data-reading-font={READING_FONT_DEFAULT}
+      data-reading-size={READING_SIZE_DEFAULT}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: READING_PREFERENCE_SCRIPT }} />
+      </head>
       <body className="min-h-dvh bg-paper text-ink antialiased">
         {/* One skip link, to the one landmark a reader actually wants. */}
         <a

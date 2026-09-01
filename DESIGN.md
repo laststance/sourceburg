@@ -398,6 +398,36 @@ against the real face so the swap does not move the column.
 
 No system stack, no Inter, no Roboto.
 
+### The reader's own two knobs
+
+That rule governs what the **desk** may choose, not what a **reader** may impose
+on their own machine. The masthead carries a `Reading options` menu with two
+radio groups — typeface (Serif / Sans-serif) and text size (Regular / Large /
+Larger) — and the defaults are exactly the design above: Source Serif 4 at 1rem
+is what everyone gets until they say otherwise.
+
+The sans path is the **system stack, not a fourth face**, and that is the whole
+point of it: it ships zero bytes, so the budget in [TODOS.md](./TODOS.md) #2
+survives, and there is no swap for a reader to watch. Source Serif 4 is what the
+page is designed in; a reader who finds a serif harder to read is better served
+by the face their own OS already renders best than by another 40KB download of
+somebody else's opinion.
+
+Both choices live as `data-reading-font` and `data-reading-size` on `<html>`, set
+by an inline script **before first paint**, and `app/globals.css` turns them into
+`--reading-family` and `--reading-scale`. Nothing reflows on load, which keeps
+the no-motion rule above true for a returning reader as well as a new one.
+
+The size knob moves **inherited** type only: prose, deks, pull quotes. Code
+excerpts and the masthead set their size in `rem` and stay put — a scaled code
+line only lengthens a horizontal scroll the reader never asked for, and its line
+numbers are part of a citation id either way.
+
+This is the first client JavaScript on the reading path. Decision 11A drove
+client JS for content to zero by tokenising code at build time, and that still
+holds: the menu renders no word of any article, and what it ships is two
+attributes.
+
 Colors are CSS variables. There are five:
 
 | Variable | Use |

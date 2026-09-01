@@ -39,7 +39,7 @@ function Headline({ incident, article }: { incident: Incident; article: Article 
         <h1 className="font-display text-5xl leading-[0.92] tracking-tight uppercase sm:text-6xl lg:text-7xl">
           {article.title}
         </h1>
-        <p className="mt-4 max-w-[46ch] font-serif text-lg leading-7">{article.dek}</p>
+        <p className="mt-4 max-w-[46ch] font-reading text-[1.125em] leading-[1.55]">{article.dek}</p>
       </div>
       <div className="justify-self-start md:justify-self-end">
         <KeyArtPlate nameWithOwner={incident.repo.nameWithOwner} />
@@ -124,7 +124,7 @@ export function ArticleView({ incident, article }: { incident: Incident; article
                 so the band only goes multi-column when there is enough to fill one. */}
             <div className={article.aftermath.length > 1 ? 'md:columns-2 md:gap-8 lg:columns-3' : 'max-w-[70ch]'}>
               {article.aftermath.map((entry, index) => (
-                <p key={index} className="column-text mb-4 font-serif text-base leading-7">
+                <p key={index} className="column-text mb-4 font-reading">
                   {entry.text}
                   <Cites cites={[entry.ref]} context={context} />
                 </p>

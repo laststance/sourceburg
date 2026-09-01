@@ -7,7 +7,7 @@ import { articleHref } from '../../lib/links'
 import type { Published } from '../../lib/publish'
 
 /*
- * The five reader paths, run at all three viewports by the config's projects.
+ * The eight reader paths, run at all three viewports by the config's projects.
  *
  * Asserted against the REAL published content rather than a fixture, for the same
  * reason the render layer's four layout bugs only appeared once incident #1 was on
@@ -91,6 +91,77 @@ test.describe('an article page carries the whole story and its receipts', () => 
     // Assert
     expect(overflow.scrollWidth).toBe(overflow.clientWidth)
     expect(wraps).toBe('pre')
+  })
+})
+
+test.describe('a reader can retype the page without losing it', () => {
+  test('switches the prose to a sans face and still has it after a reload', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    const paragraph = page.locator('.column-text').first()
+    const asPublished = await paragraph.evaluate((element) => getComputedStyle(element).fontFamily)
+
+    // Act
+    await page.getByText('Reading options').click()
+    await page.getByRole('radio', { name: 'Sans-serif' }).check()
+    const afterSwitching = await paragraph.evaluate((element) => getComputedStyle(element).fontFamily)
+    await page.reload()
+    const afterReload = await paragraph.evaluate((element) => getComputedStyle(element).fontFamily)
+
+    // Assert — the desk still ships the serif to everyone who has not asked otherwise
+    expect(asPublished).toContain('Georgia')
+    expect(afterSwitching).toContain('system-ui')
+    expect(afterSwitching).not.toContain('Georgia')
+    // A preference nobody remembers is a preference nobody uses: the whole point of the
+    // pre-paint script is that this survives the next page, not just this render.
+    expect(afterReload).toContain('system-ui')
+  })
+
+  test('grows the prose at the largest step without ever scrolling the page sideways', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    const paragraph = page.locator('.column-text').first()
+    const excerpt = page.locator('.code-scroll code').first()
+    const sizeOf = (element: Element) => parseFloat(getComputedStyle(element).fontSize)
+    const proseAtRegular = await paragraph.evaluate(sizeOf)
+    const codeAtRegular = await excerpt.evaluate(sizeOf)
+
+    // Act
+    await page.getByText('Reading options').click()
+    await page.getByRole('radio', { name: 'Larger' }).check()
+    const proseAtLarger = await paragraph.evaluate(sizeOf)
+    const codeAtLarger = await excerpt.evaluate(sizeOf)
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }))
+    const wraps = await excerpt.evaluate((element) => getComputedStyle(element).whiteSpace)
+
+    // Assert
+    expect(proseAtRegular).toBe(16)
+    expect(proseAtLarger).toBe(20)
+    // A code excerpt sets its own size in `rem` and must NOT move with the knob: its line
+    // numbers are part of a citation id, and a wider line only lengthens a horizontal
+    // scroll the reader never asked for.
+    expect(codeAtRegular).toBe(12)
+    expect(codeAtLarger).toBe(12)
+    expect(wraps).toBe('pre')
+    // The bug this guards is the one that has bitten this layout three times: a grid
+    // track sized to min-content, found only once the content got wide enough.
+    expect(overflow.scrollWidth).toBe(overflow.clientWidth)
+  })
+
+  test('has no axe-detectable violations with the reading menu open', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    await page.getByText('Reading options').click()
+
+    // Act — the radios only enter the accessibility tree once the disclosure is open, so
+    // the site-wide scan above never sees them.
+    const scan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()
+
+    // Assert
+    expect(scan.violations).toEqual([])
   })
 })
 

@@ -14,6 +14,32 @@
   --code-spot: #8c2318;
 }
 
+/*
+ * The two reader knobs, and the defaults ARE the design: the desk still sets Source
+ * Serif 4 at 1rem, and only a reader who asks gets anything else. An override lands on
+ * `<html>` before first paint, so switching costs a variable swap and never a reflow
+ * a reader watches happen.
+ *
+ * DESIGN.md's "No system stack, no Inter, no Roboto" governs what the DESK may choose,
+ * not what a reader may impose on their own machine. The sans path is deliberately the
+ * system stack rather than a fourth self-hosted face: it ships zero bytes, so the font
+ * budget in TODOS #2 survives, and there is no swap to watch on a page that says
+ * nothing animates.
+ */
+:root {
+  --reading-family: var(--font-source-serif), ui-serif, Georgia, serif;
+  --reading-scale: 1;
+}
+[data-reading-font='sans'] {
+  --reading-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+[data-reading-size='large'] {
+  --reading-scale: 1.125;
+}
+[data-reading-size='larger'] {
+  --reading-scale: 1.25;
+}
+
 @theme inline {
   --color-paper: var(--paper);
   --color-ink: var(--ink);
@@ -22,14 +48,23 @@
   --color-code-spot: var(--code-spot);
 
   --font-display: var(--font-anton), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-source-serif), ui-serif, Georgia, serif;
+  /* Named for the job, not the shape: a reader may put a sans stack in here. */
+  --font-reading: var(--reading-family);
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-serif);
+  font-family: var(--font-reading);
+  /*
+   * The size knob, applied once. Only text that INHERITS its size moves with it, which
+   * is the article's prose, deks and pull quotes. Code excerpts and the masthead set
+   * their own size in `rem` and stay put on purpose: scaling a code line only lengthens
+   * a horizontal scroll the reader did not ask for, and its line numbers are part of a
+   * citation id either way.
+   */
+  font-size: calc(1rem * var(--reading-scale));
 }
 
 /* Nothing animates in v1, so there is nothing for prefers-reduced-motion to turn off. */
@@ -85,6 +120,8 @@ body {
 .column-text {
   text-align: justify;
   hyphens: auto;
+  font-size: 1em;
+  line-height: 1.75;
 }
 @media (max-width: 767px) {
   .column-text {

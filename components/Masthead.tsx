@@ -1,7 +1,9 @@
 import Link from 'next/link'
 
+import { ReadingControls } from './ReadingControls'
+
 /**
- * The site header on every page: wordmark, slogan, hairline rule, feed link.
+ * The site header on every page: wordmark, slogan, hairline rule, feed link, reading menu.
  *
  * The slogan is not decoration. There is no nav and no About page in v1, so it is the
  * only place a first-time reader learns that these articles are generated and then
@@ -18,11 +20,17 @@ export function Masthead() {
         <Link href="/" className="font-display text-2xl leading-none tracking-wide uppercase">
           sourceburg
         </Link>
-        <p className="font-serif text-sm italic">Every fact machine-verified against its source</p>
-        {/* The one delivery channel in v1, so it is visible rather than discoverable. */}
-        <a href="/feed.xml" className="permalink ml-auto font-mono text-xs tracking-wide uppercase underline">
-          Atom feed /feed.xml
-        </a>
+        <p className="font-reading text-sm italic">Every fact machine-verified against its source</p>
+        {/* The two things a reader can act on, pushed right together so the slogan keeps
+            the left. `ml-auto` goes on the group, not on the link, or the menu detaches.
+            The feed is the one delivery channel in v1, so it stays visible rather than
+            discoverable. */}
+        <div className="ml-auto flex items-baseline gap-x-5">
+          <a href="/feed.xml" className="permalink font-mono text-xs tracking-wide uppercase underline">
+            Atom feed /feed.xml
+          </a>
+          <ReadingControls />
+        </div>
       </div>
     </header>
   )

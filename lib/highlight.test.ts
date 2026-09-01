@@ -58,30 +58,39 @@ describe('code is printed in two tones, because the palette has five colours', (
   })
 })
 
-describe('no component hands raw HTML to React', () => {
-  it('finds no dangerouslySetInnerHTML in any source file', async () => {
-    // Arrange — Shiki's `codeToHtml` returns a string of HTML, and the one obvious way
-    // to render it is the one prop that turns model-adjacent text into live markup.
-    // `codeToTokens` exists so that never has to happen; this is what keeps it true
-    // after the next edit. Matches the JSX attribute and the object property, never
-    // the three comments that explain the absence.
+describe('no renderer hands raw HTML to React', () => {
+  it('finds dangerouslySetInnerHTML in the root layout and nowhere else', async () => {
+    // Arrange — Shiki's `codeToHtml` returns a string of HTML, and the one obvious way to
+    // render it is the one prop that turns model-adjacent text into live markup.
+    // `codeToTokens` exists so that never has to happen; this is what keeps it true after
+    // the next edit.
+    //
+    // `app/layout.tsx` is the one allowed site, and it is allowed by PATH so that adding
+    // a second is a test failure rather than a judgment call. What lives there is the
+    // pre-paint script that applies a reader's stored font and size: a frozen literal
+    // built from this repo's own constants, writing into an attribute, never into markup,
+    // and never touching a fact-set. A renderer doing the same thing with quoted text is
+    // the defect this catches, and no renderer is on the list.
     const { execFileSync } = await import('node:child_process')
     const root = join(import.meta.dirname, '..')
 
-    // Act — grep exits 1 when it matches nothing, which is the PASSING case here, so
-    // the throw is caught and read as an empty result rather than as a broken test.
-    let hits: string
+    // Act — grep exits 1 when it matches nothing, which is a passing case here, so the
+    // throw is caught and read as an empty result rather than as a broken test.
+    let hits: string[]
     try {
       hits = execFileSync(
         'grep',
-        ['-rn', '-E', String.raw`dangerouslySetInnerHTML\s*[=:]`, '--include=*.ts', '--include=*.tsx', 'app', 'components', 'lib', 'bin'],
+        ['-rl', '-E', String.raw`dangerouslySetInnerHTML\s*[=:]`, '--include=*.ts', '--include=*.tsx', 'app', 'components', 'lib', 'bin'],
         { cwd: root, encoding: 'utf8' },
-      ).trim()
+      )
+        .trim()
+        .split('\n')
+        .filter((line) => line !== '')
     } catch {
-      hits = ''
+      hits = []
     }
 
     // Assert
-    expect(hits).toBe('')
+    expect(hits).toEqual(['app/layout.tsx'])
   })
 })

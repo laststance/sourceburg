@@ -60,7 +60,7 @@ type ProseSentences = Extract<Article['blocks'][number], { type: 'prose' }>['sen
 /** Justified serif column text. One sentence per element, so a marker sits with its claim. */
 function ProseBlock({ sentences, context }: { sentences: ProseSentences; context: BlockContext }) {
   return (
-    <p className="column-text mb-4 font-serif text-base leading-7">
+    <p className="column-text mb-4 font-reading">
       {sentences.map((sentence, index) => (
         <span key={index}>
           {sentence.text}
@@ -148,7 +148,7 @@ function PersonQuoteBox({ blockRef, context }: { blockRef: string; context: Bloc
 
   return (
     <figure className="mb-6 break-inside-avoid border border-rule p-4">
-      <blockquote className="font-serif text-lg leading-7 italic">{quote.excerpt}</blockquote>
+      <blockquote className="font-reading text-[1.125em] leading-[1.55] italic">{quote.excerpt}</blockquote>
       <figcaption className="mt-3 font-mono text-xs">
         <cite className="not-italic">@{quote.author}</cite>
         {permalink === null ? null : (
@@ -253,7 +253,7 @@ function TimelineBox({ context }: { context: BlockContext }) {
         {facts.map((fact) => (
           <li key={`${fact.at}-${fact.ref}`} className="border-t border-rule pt-2">
             <p className="font-mono text-[0.7rem] tracking-wide uppercase opacity-70">{fact.at.slice(0, 10)}</p>
-            <p className="font-serif text-sm leading-5">
+            <p className="font-reading text-[0.875em] leading-[1.45]">
               {fact.label}
               <Cites cites={[fact.ref]} context={context} />
             </p>

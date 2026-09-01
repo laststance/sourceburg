@@ -32,7 +32,7 @@ export default async function HomePage() {
         {layout.kind === 'empty' ? (
           <div className="mx-auto flex max-w-[1400px] flex-col items-start gap-6 px-4 py-20 sm:px-6">
             <p className="font-display text-5xl leading-none tracking-tight uppercase sm:text-7xl">No news today</p>
-            <p className="font-serif text-lg">Nothing has been verified for publication yet.</p>
+            <p className="font-reading text-lg">Nothing has been verified for publication yet.</p>
             <a href="/feed.xml" className="permalink font-mono text-sm underline">
               Atom feed · /feed.xml
             </a>
@@ -49,7 +49,7 @@ export default async function HomePage() {
                       <Link href={articleHref(entry.incident)} className="font-display text-2xl uppercase underline">
                         {entry.article.title}
                       </Link>
-                      <p className="mt-1 max-w-[60ch] font-serif">{entry.article.dek}</p>
+                      <p className="mt-1 max-w-[60ch] font-reading">{entry.article.dek}</p>
                     </li>
                   ))}
                 </ol>

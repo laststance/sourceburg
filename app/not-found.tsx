@@ -15,7 +15,7 @@ export default function NotFound() {
         {/* An `h1`, not a big `p`: it is the only thing on the page that says where
             you are, so a reader who navigates by heading has to be able to find it. */}
         <h1 className="font-display text-5xl leading-none tracking-tight uppercase sm:text-7xl">No such page</h1>
-        <p className="font-serif text-lg">That address does not name anything published here.</p>
+        <p className="font-reading text-lg">That address does not name anything published here.</p>
         <div className="flex flex-wrap gap-4 font-mono text-sm">
           <Link href="/" className="permalink underline">
             Front page
