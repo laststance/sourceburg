@@ -182,7 +182,13 @@ function DiffBox({ context }: { context: BlockContext }) {
   ]
 
   return (
-    <figure className="mb-6 break-inside-avoid border border-rule">
+    /*
+     * `column-span: all` — the box takes the full BREAKING column instead of one
+     * of its three tracks. A before/after in a 300px track cuts every line of both
+     * panes, and two panes a reader has to scroll separately are not a comparison.
+     * The code excerpt stays in the flow: it is one pane and it reads fine narrow.
+     */
+    <figure className="mb-6 break-inside-avoid border border-rule [column-span:all]">
       <figcaption className="border-b border-rule px-3 py-1 font-mono text-xs">{diff.path}</figcaption>
       {sides.map((side) => (
         <div key={side.label} className="border-b border-rule last:border-b-0">
