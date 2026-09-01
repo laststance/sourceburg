@@ -161,7 +161,10 @@ export function FrontPageLead({ incident, article }: { incident: Incident; artic
         ))}
       </div>
       <p className="mt-2 font-display text-sm tracking-widest uppercase">
-        <Link href={href} className="underline">
+        {/* The visible words are the design's jump line. The accessible name adds the
+            headline, because a screen reader listing every link on the front page
+            would otherwise announce "Continued" with nothing to distinguish it. */}
+        <Link href={href} className="underline" aria-label={`Continued: ${article.title}`}>
           Continued &raquo;
         </Link>
       </p>

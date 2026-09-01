@@ -96,7 +96,15 @@ async function CodeQuoteBox({ blockRef, context }: { blockRef: string; context: 
       <figcaption className="border-b border-rule px-3 py-1 font-mono text-xs">
         {quote.path} @ {quote.atSha.slice(0, SHORT_SHA_LENGTH)}
       </figcaption>
-      <div className="code-scroll px-3 py-2">
+      {/* Focusable and named: the box scrolls sideways because excerpts never wrap,
+          and a scrollable region a keyboard cannot reach is text a keyboard user
+          cannot read. axe `scrollable-region-focusable`, WCAG 2.1.1. */}
+      <div
+        className="code-scroll px-3 py-2"
+        tabIndex={0}
+        role="region"
+        aria-label={`${quote.path} lines ${quote.startLine} to ${quote.endLine}`}
+      >
         <pre className="text-xs leading-5">
           <code>
             {lines.map((line) => (
@@ -179,7 +187,7 @@ function DiffBox({ context }: { context: BlockContext }) {
       {sides.map((side) => (
         <div key={side.label} className="border-b border-rule last:border-b-0">
           <p className="px-3 pt-2 font-mono text-[0.7rem] tracking-wide uppercase opacity-70">{side.label}</p>
-          <div className="code-scroll px-3 pt-1 pb-2">
+          <div className="code-scroll px-3 pt-1 pb-2" tabIndex={0} role="region" aria-label={side.label}>
             {side.lines.length === 0 ? (
               // A creation has no before and a deletion has no after. Say which, rather
               // than print an empty pane the reader has to interpret.

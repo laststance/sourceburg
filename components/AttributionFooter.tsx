@@ -18,7 +18,10 @@ import type { Incident } from '../lib/schema'
 /** One footer row: a label in the display face, its content beside it. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[5.5rem_1fr] gap-x-3 border-t border-rule py-2 first:border-t-0">
+    // `minmax(0, 1fr)`, not `1fr`: a bare fr track takes its min-content width, and
+    // a source label like `src/logic/getFieldArrayParentNames.ts:3-10` is 41 unbreakable
+    // characters — enough on its own to push a 375px page 55px sideways.
+    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 border-t border-rule py-2 first:border-t-0">
       <p className="font-display text-xs tracking-widest uppercase">{label}</p>
       <div className="font-mono text-xs leading-5">{children}</div>
     </div>
@@ -71,7 +74,9 @@ export function AttributionFooter({ incident, orderedRefs }: { incident: Inciden
               const permalink = permalinkFor(ref, incident)
               const label = sourceLabelFor(ref, incident)
               return (
-                <li key={ref} id={`src-${index + 1}`} className="mb-2 break-inside-avoid">
+                // `break-words` rather than `break-all`: a long path may break mid-token
+                // when it has to, and an ordinary label still breaks at its spaces.
+                <li key={ref} id={`src-${index + 1}`} className="mb-2 break-words break-inside-avoid">
                   <span className="pr-1">[{index + 1}]</span>
                   {label}
                   {permalink === null ? null : (
