@@ -204,6 +204,9 @@ export async function publish(
   }
 }
 
+/** One live publication: the pointer, the facts it froze, and the article built from them. */
+export type Published = { manifest: Manifest; incident: Incident; article: Article }
+
 /**
  * Reads back what the pointer names, parsing both halves. A manifest that
  * resolves to a truncated `article.json` is the half-published state the version
@@ -212,9 +215,7 @@ export async function publish(
  * @returns the published pair, or null when nothing is published
  * @example (await readPublished(dir))?.article.title
  */
-export async function readPublished(
-  dir: string,
-): Promise<{ manifest: Manifest; incident: Incident; article: Article } | null> {
+export async function readPublished(dir: string): Promise<Published | null> {
   const manifest = await readManifest(dir)
   if (manifest === null) return null
   const versionDir = join(dir, manifest.version)

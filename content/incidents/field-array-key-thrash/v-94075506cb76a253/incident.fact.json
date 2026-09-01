@@ -1,0 +1,97 @@
+{
+  "id": "field-array-key-thrash",
+  "signal": "git-trace",
+  "selection": {
+    "kind": "manual",
+    "reason": "first incident, hand-picked to exercise every probe kind"
+  },
+  "repo": {
+    "nameWithOwner": "react-hook-form/react-hook-form",
+    "defaultBranch": "master",
+    "spdxLicense": "MIT"
+  },
+  "anchorSha": "a2ac01fd3872cf95b4e6ac8f4b4800f72b55eafd",
+  "knownAt": "2026-05-17T23:41:25Z",
+  "commits": [
+    {
+      "sha": "a2ac01fd3872cf95b4e6ac8f4b4800f72b55eafd",
+      "committedAt": "2026-05-17T23:41:25Z",
+      "subject": "🧪 test(useFieldArray): regression coverage for descendant setValue key thrashing (#13420) (#13453)"
+    },
+    {
+      "sha": "c6c3d87eb844af1fd1c01428f2fa113735982d4c",
+      "committedAt": "2026-05-09T02:02:12Z",
+      "subject": "🐞 fix #13260: notify all matching field-array roots on nested setValue updates (#13420)"
+    },
+    {
+      "sha": "dfcebdbde1891fdd76fb56751cbe08dd980dfa5b",
+      "committedAt": "2026-05-17T23:01:00Z",
+      "subject": "Revert \"🐞 fix #13260: notify all matching field-array roots on nested setValue updates (#13420)\""
+    },
+    {
+      "sha": "ca01f6582e315a59cc6e3c9fc51ef5ecc2b69e48",
+      "committedAt": "2026-05-17T22:54:48Z",
+      "subject": "Revert \"🐞 fix(useFieldArray): preserve managed field ids in array subscriber …\" (#13452)"
+    }
+  ],
+  "discussions": [
+    {
+      "kind": "issue",
+      "number": 13260,
+      "createdAt": "2026-01-20T09:15:09Z",
+      "quotes": []
+    },
+    {
+      "kind": "pr",
+      "number": 13420,
+      "createdAt": "2026-05-09T01:38:20Z",
+      "quotes": [
+        {
+          "excerpt": "this causes react keys to thrash on `setValue` which causes component remount and field to lose focus",
+          "bodyHash": "aed315968be5232ec23c327bd695d41404cac3d14f114d2cc5e9c838ca2ad704",
+          "offset": 8,
+          "author": "maxkostow",
+          "commentId": 4472139263,
+          "createdAt": "2026-05-17T18:44:19Z",
+          "fetchedAt": "2026-09-01T07:49:51Z"
+        },
+        {
+          "excerpt": "Can we open a seperate issue with a codesandbox or code to reproduce?",
+          "bodyHash": "02ebbc177f2d7a2f95f1def7613fe075a41ebcf4a631287c0078a629268074f0",
+          "offset": 115,
+          "author": "bluebill1049",
+          "commentId": 4472672303,
+          "createdAt": "2026-05-17T22:17:17Z",
+          "fetchedAt": "2026-09-01T07:49:51Z"
+        }
+      ]
+    }
+  ],
+  "codeQuotes": [
+    {
+      "path": "src/logic/getFieldArrayParentNames.ts",
+      "atSha": "c6c3d87eb844af1fd1c01428f2fa113735982d4c",
+      "atShaCommittedAt": "2026-05-09T02:02:12Z",
+      "startLine": 3,
+      "endLine": 10,
+      "text": "export default (names: Set<InternalFieldName>, name: InternalFieldName) => {\n  const parts = name.split('.');\n  const matches: string[] = [];\n  let prefix = parts[0];\n\n  for (let i = 1; i < parts.length; prefix += '.' + parts[i++]) {\n    !isNaN(+parts[i]) && names.has(prefix) && matches.push(prefix);\n  }"
+    }
+  ],
+  "diff": {
+    "beforeSha": "ca01f6582e315a59cc6e3c9fc51ef5ecc2b69e48",
+    "afterSha": "dfcebdbde1891fdd76fb56751cbe08dd980dfa5b",
+    "path": "src/logic/getFieldArrayParentNames.ts",
+    "hunk": "diff --git a/src/logic/getFieldArrayParentNames.ts b/src/logic/getFieldArrayParentNames.ts\ndeleted file mode 100644\nindex ef24d178..00000000\n--- a/src/logic/getFieldArrayParentNames.ts\n+++ /dev/null\n@@ -1,13 +0,0 @@\n-import type { InternalFieldName } from '../types';\n-\n-export default (names: Set<InternalFieldName>, name: InternalFieldName) => {\n-  const parts = name.split('.');\n-  const matches: string[] = [];\n-  let prefix = parts[0];\n-\n-  for (let i = 1; i < parts.length; prefix += '.' + parts[i++]) {\n-    !isNaN(+parts[i]) && names.has(prefix) && matches.push(prefix);\n-  }\n-\n-  return matches;\n-};\n"
+  },
+  "revealedLater": [
+    {
+      "at": "2026-05-28T12:26:34Z",
+      "what": "The issue reopened: a reader reported the original bug still reproducing eleven days after the revert.",
+      "evidence": {
+        "kind": "discussion",
+        "number": 13260,
+        "commentId": 4563957418
+      }
+    }
+  ]
+}

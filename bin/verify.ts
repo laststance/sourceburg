@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
 
-import { incidentDir, readManifest } from '../lib/publish'
+import { incidentDir, publish, readManifest } from '../lib/publish'
 import { Article, Incident } from '../lib/schema'
 import { execute } from '../lib/verify/execute'
 import { plan } from '../lib/verify/plan'
@@ -13,6 +13,11 @@ import { verify } from '../lib/verify/verify'
  * The verifier as a command. Exit codes are the whole interface: 0 publishes, 1
  * means a fact is wrong and CI must never retry, 2 means we could not tell and CI
  * may. A run that printed "failed" and exited 0 would make "reporting" a lie.
+ *
+ * `--publish` lives HERE rather than in a `bin/publish.ts` of its own. A separate
+ * command could be run without this one, and then the exit code above would be
+ * advice instead of a gate; from inside the same process, an unverified article
+ * has no path to `content/`.
  */
 
 function argOf(flag: string): string | undefined {
@@ -61,7 +66,19 @@ async function main(): Promise<number> {
   const result = verify(incident, article, previous, probes)
 
   report(result, requests.length)
-  return exitCodeFor(result.verdict)
+  if (result.verdict !== 'PASS') return exitCodeFor(result.verdict)
+
+  if (process.argv.includes('--publish')) {
+    if (contentDir === undefined) {
+      process.stderr.write('--publish needs --content-dir\n')
+      return 2
+    }
+    // `updatedAt` is stamped here, not taken from the article: the writer decides
+    // what the story says, the pipeline decides when a version became live.
+    const manifest = await publish(incident, article, { contentDir, updatedAt: new Date().toISOString() })
+    process.stdout.write(`published ${incident.id} version ${manifest.version}\n`)
+  }
+  return 0
 }
 
 main().then(

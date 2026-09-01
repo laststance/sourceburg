@@ -1,0 +1,122 @@
+{
+  "incidentId": "field-array-key-thrash",
+  "lang": "en",
+  "persona": "desk",
+  "title": "A field-array fix survived eight days before its author reverted it",
+  "titleCites": [
+    "commit:dfcebdbde1891fdd76fb56751cbe08dd980dfa5b"
+  ],
+  "dek": "react-hook-form shipped a fix for stale field-array values on 9 May. On 17 May the maintainer pulled it back out and landed a regression test instead.",
+  "dekCites": [
+    "commit:c6c3d87eb844af1fd1c01428f2fa113735982d4c",
+    "commit:a2ac01fd3872cf95b4e6ac8f4b4800f72b55eafd"
+  ],
+  "publishedAt": "2026-05-17T23:41:25Z",
+  "updatedAt": "2026-05-17T23:41:25Z",
+  "blocks": [
+    {
+      "type": "prose",
+      "sentences": [
+        {
+          "text": "For eight days react-hook-form carried a fix that was supposed to make nested setValue calls reach every field array watching the name being written.",
+          "cites": []
+        },
+        {
+          "text": "It came back out on a Sunday night, and the commit that replaced it added no behaviour at all.",
+          "cites": []
+        }
+      ]
+    },
+    {
+      "type": "prose",
+      "sentences": [
+        {
+          "text": "The fix landed on 9 May as part of pull request 13420, which claimed to close an issue opened in January about field values in useFieldArray failing to update after a setValue call.",
+          "cites": [
+            "commit:c6c3d87eb844af1fd1c01428f2fa113735982d4c",
+            "discussion:13260"
+          ]
+        },
+        {
+          "text": "Its whole mechanism was a new helper that walked a dotted field name outward and collected every registered ancestor that looked like an array root.",
+          "cites": [
+            "code:c6c3d87eb844af1fd1c01428f2fa113735982d4c:src/logic/getFieldArrayParentNames.ts:3-10"
+          ]
+        },
+        {
+          "text": "The loop rebuilt the prefix one segment at a time and pushed any prefix that was both a known name and immediately followed by a numeric index.",
+          "cites": [
+            "code:c6c3d87eb844af1fd1c01428f2fa113735982d4c:src/logic/getFieldArrayParentNames.ts:3-10"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "codeQuote",
+      "ref": "code:c6c3d87eb844af1fd1c01428f2fa113735982d4c:src/logic/getFieldArrayParentNames.ts:3-10"
+    },
+    {
+      "type": "prose",
+      "sentences": [
+        {
+          "text": "Eight days later a user reported on the pull request that the new notification path was remounting components and stealing focus mid-keystroke.",
+          "cites": [
+            "discussion:13420#4472139263"
+          ]
+        },
+        {
+          "text": "The maintainer asked for a reproduction, and then, without waiting for one, reverted the change outright about forty minutes later.",
+          "cites": [
+            "discussion:13420#4472672303",
+            "commit:dfcebdbde1891fdd76fb56751cbe08dd980dfa5b"
+          ]
+        },
+        {
+          "text": "The revert deleted the helper file in its entirety rather than narrowing the condition that produced the extra notifications.",
+          "cites": [
+            "commit:dfcebdbde1891fdd76fb56751cbe08dd980dfa5b"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "personQuote",
+      "ref": "discussion:13420#4472139263"
+    },
+    {
+      "type": "diffBox"
+    },
+    {
+      "type": "prose",
+      "sentences": [
+        {
+          "text": "Forty minutes after the revert the same maintainer landed a test-only commit adding regression coverage for exactly the key-thrashing behaviour that had just been removed.",
+          "cites": [
+            "commit:a2ac01fd3872cf95b4e6ac8f4b4800f72b55eafd"
+          ]
+        },
+        {
+          "text": "That ordering is the interesting part: the project chose to encode the symptom it had observed before it had a fix that survived contact with the symptom.",
+          "cites": [
+            "commit:a2ac01fd3872cf95b4e6ac8f4b4800f72b55eafd"
+          ]
+        },
+        {
+          "text": "A separate revert of a related field-array change had gone in six minutes before the first one, so two fixes to the same subsystem came out on the same evening.",
+          "cites": [
+            "commit:ca01f6582e315a59cc6e3c9fc51ef5ecc2b69e48"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "timelineBox"
+    }
+  ],
+  "aftermath": [
+    {
+      "text": "Eleven days later the original issue picked up its first comment since January, from a reader reporting the same broken behaviour.",
+      "ref": "revealed:discussion:13260#4563957418:f171135a124c"
+    }
+  ]
+}
