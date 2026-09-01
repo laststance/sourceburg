@@ -143,3 +143,41 @@ body {
     }
   }
 }
+
+/*
+ * Puts the reading menu's `popover` panel back under its button.
+ *
+ * `popover` promotes the panel to the top layer, which is what buys light-dismiss for
+ * free, and is also why the `absolute right-0` it replaced stopped meaning anything:
+ * there is no ancestor left to be positioned against. Anchor positioning is the only
+ * way back, so the panel names its button as an anchor and sits below it, right edges
+ * flush, exactly where the old panel was.
+ *
+ * Where anchor positioning is missing — Safari before 18.2, roughly a tenth of readers
+ * — the `@supports` block does not apply and the UA's own `inset: 0; margin: auto`
+ * centres the panel in the viewport. That is a real difference, not a free fallback: a
+ * centred panel reads as a dialog rather than as a masthead disclosure. It is still the
+ * better of the two available wrongs, because the masthead does not stick, so a panel
+ * pinned to the top right by hand would drift away from its own button on first scroll.
+ */
+@layer components {
+  .reading-menu-button {
+    anchor-name: --reading-menu;
+  }
+  @supports (position-anchor: --supported) {
+    .reading-menu-panel {
+      position-anchor: --reading-menu;
+      /* Below the button, spanning leftward from its right edge — the old `right-0`. */
+      position-area: bottom span-left;
+      /* The UA sheet centres every popover with `inset: 0; margin: auto`, and both fight
+         `position-area` for the box. Clearing them here rather than in JSX keeps the
+         reset next to the rule that needs it; the `mt-2` on the element still lands,
+         because a utility outranks this layer and margin-top survives the shorthand. */
+      inset: auto;
+      margin: 0;
+      /* `overflow: auto` is a UA default too, and this panel is never tall enough to
+         need a scroll container — it only ever produced a stray clipping edge. */
+      overflow: visible;
+    }
+  }
+}

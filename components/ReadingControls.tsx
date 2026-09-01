@@ -23,7 +23,7 @@ import type { ReadingFont, ReadingSize } from '../lib/constants'
  * here renders a word of the article. All this ships is a preference: two attributes on
  * `<html>`, which `app/globals.css` turns into a family and a scale.
  *
- * Native `<details>` and native radios, so there is no focus management, no ARIA to get
+ * A native `popover` and native radios, so there is no focus management, no ARIA to get
  * wrong, and no open/close state in React. The choice a reader makes is theirs, not the
  * desk's: DESIGN.md still specifies Source Serif 4 at 1rem, and that is what everyone
  * gets until they say otherwise.
@@ -204,9 +204,12 @@ function ReadingRadioGroup<Value extends string>(props: {
   )
 }
 
+/** The panel's id, which is also the whole wiring between the button and the panel. */
+const READING_MENU_ID = 'reading-menu'
+
 /**
  * The reading menu in the masthead: pick a typeface, pick a size, both remembered.
- * @returns a `<details>` disclosure whose panel floats, so opening it never pushes the page down
+ * @returns a button and a `popover` panel, which the browser opens, closes and light-dismisses
  * @example <ReadingControls />
  */
 export function ReadingControls() {
@@ -231,13 +234,25 @@ export function ReadingControls() {
   }, [])
 
   return (
-    <details className="relative">
-      <summary className="cursor-pointer font-mono text-xs tracking-wide uppercase underline">
+    <>
+      <button
+        type="button"
+        popoverTarget={READING_MENU_ID}
+        className="reading-menu-button cursor-pointer font-mono text-xs tracking-wide uppercase underline"
+      >
         Reading options
-      </summary>
-      {/* Absolute, so opening the menu floats over the page instead of shoving the
-          article down. DESIGN.md says nothing animates, and a reflow is motion. */}
-      <div className="absolute right-0 z-20 mt-2 w-max border border-ink bg-paper px-4 py-3">
+      </button>
+      {/* `popover` rather than `<details>`, because a menu that only closes by clicking
+          its own trigger again is a menu readers leave open by accident. The browser
+          gives Escape and click-outside for free here, and still no open/close state in
+          React. It also takes the panel out of flow entirely, so opening it floats over
+          the page instead of shoving the article down — DESIGN.md says nothing animates,
+          and a reflow is motion. `app/globals.css` puts it back under the button. */}
+      <div
+        id={READING_MENU_ID}
+        popover="auto"
+        className="reading-menu-panel mt-2 w-max border border-ink bg-paper px-4 py-3"
+      >
         <ReadingRadioGroup
           legend="Typeface"
           name="reading-font"
@@ -255,6 +270,6 @@ export function ReadingControls() {
           />
         </div>
       </div>
-    </details>
+    </>
   )
 }

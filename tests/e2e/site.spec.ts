@@ -109,7 +109,7 @@ test.describe('a reader can retype the page without losing it', () => {
     const asPublished = await paragraph.evaluate((element) => getComputedStyle(element).fontFamily)
 
     // Act
-    await page.getByText('Reading options').click()
+    await page.getByRole('button', { name: 'Reading options' }).click()
     await page.getByRole('radio', { name: 'Sans-serif' }).check()
     const afterSwitching = await paragraph.evaluate((element) => getComputedStyle(element).fontFamily)
     await page.reload()
@@ -134,7 +134,7 @@ test.describe('a reader can retype the page without losing it', () => {
     const codeAtRegular = await excerpt.evaluate(sizeOf)
 
     // Act
-    await page.getByText('Reading options').click()
+    await page.getByRole('button', { name: 'Reading options' }).click()
     await page.getByRole('radio', { name: 'Larger' }).check()
     const proseAtLarger = await paragraph.evaluate(sizeOf)
     const codeAtLarger = await excerpt.evaluate(sizeOf)
@@ -179,7 +179,7 @@ test.describe('a reader can retype the page without losing it', () => {
   test('gives every menu row a 44px target', async ({ page }) => {
     // Arrange
     await page.goto(articleHref((await newest()).incident))
-    await page.getByText('Reading options').click()
+    await page.getByRole('button', { name: 'Reading options' }).click()
 
     // Act
     const rowHeights = await page
@@ -189,6 +189,99 @@ test.describe('a reader can retype the page without losing it', () => {
     // Assert — 44px is what this site gives its own cite markers, and the reader most likely
     // to want this menu is the one least able to hit a 32px row.
     expect(rowHeights).toEqual([44, 44, 44])
+  })
+
+  test('closes the menu when the reader presses Escape', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    const choices = page.getByRole('radio', { name: 'Sans-serif' })
+    await page.getByRole('button', { name: 'Reading options' }).click()
+    await expect(choices).toBeVisible()
+
+    // Act
+    await page.keyboard.press('Escape')
+
+    // Assert — the `<details>` this replaced ignored Escape, so the only way out of the
+    // menu was hitting the same small link a second time. A reader who opened it, read
+    // the choices and moved on left it hanging over the article.
+    await expect(choices).toBeHidden()
+  })
+
+  test('closes the menu when the reader clicks the article behind it', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    const choices = page.getByRole('radio', { name: 'Sans-serif' })
+    await page.getByRole('button', { name: 'Reading options' }).click()
+    await expect(choices).toBeVisible()
+
+    // Act
+    await page.locator('.column-text').first().click()
+
+    // Assert — light dismiss, which is the whole reason this is a `popover` and not a
+    // `<details>`. Clicking away from an open menu means the reader is done with it.
+    await expect(choices).toBeHidden()
+  })
+
+  test('walks a keyboard into the menu choices and back out to the button', async ({ page }) => {
+    // Arrange
+    const focused = () =>
+      page.evaluate(() => {
+        const element = document.activeElement
+        if (element instanceof HTMLInputElement) return `${element.name}=${element.value}`
+        return element?.textContent?.trim() ?? ''
+      })
+    await page.goto(articleHref((await newest()).incident))
+    await page.getByRole('button', { name: 'Reading options' }).focus()
+
+    // Act — open it, tab through both groups, leave.
+    await page.keyboard.press('Enter')
+    const afterOpening = await focused()
+    await page.keyboard.press('Tab')
+    const firstStop = await focused()
+    await page.keyboard.press('Tab')
+    const secondStop = await focused()
+    await page.keyboard.press('Escape')
+    const afterEscape = await focused()
+
+    // Assert — the panel renders in the top layer, and both of these are the browser's
+    // doing rather than this component's: Tab goes from an invoker into the popover it
+    // opens wherever that popover sits in the document, and Escape hands focus back. Both
+    // were checked by moving the panel ahead of its button in the JSX, which changes
+    // neither. What this pins is that the pair stays a real invoker/popover relationship —
+    // break the `popoverTarget` id, or reach for a click handler and `showPopover()`
+    // instead, and a keyboard user tabs past the menu into the Atom link with no way in.
+    // Escape is also more than the `<details>` this replaced ever did: there it did
+    // nothing, so the way out of the menu was a mouse.
+    expect(afterOpening).toBe('Reading options')
+    expect(firstStop).toBe('reading-font=serif')
+    expect(secondStop).toBe('reading-size=regular')
+    expect(afterEscape).toBe('Reading options')
+  })
+
+  test('hangs the menu under its button with their right edges flush', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    await page.getByRole('button', { name: 'Reading options' }).click()
+
+    // Act
+    const edges = await page.evaluate(() => {
+      const button = document.querySelector('.reading-menu-button')
+      const panel = document.querySelector('.reading-menu-panel')
+      if (button === null || panel === null) throw new Error('the reading menu is not on the page')
+      const buttonBox = button.getBoundingClientRect()
+      const panelBox = panel.getBoundingClientRect()
+      return {
+        gapBelowButton: Math.round(panelBox.top - buttonBox.bottom),
+        rightEdgeDrift: Math.round(panelBox.right - buttonBox.right),
+        offLeftEdge: Math.round(Math.min(0, panelBox.left)),
+      }
+    })
+
+    // Assert — 8px is the `mt-2` on the panel, and a right edge flush with the button is
+    // where the old `absolute right-0` put it. Both come from `position-area` now, and a
+    // popover with no anchor rule silently centres itself in the viewport instead, which
+    // is the failure this pins: it looks deliberate and reads as a dialog.
+    expect(edges).toEqual({ gapBelowButton: 8, rightEdgeDrift: 0, offLeftEdge: 0 })
   })
 
   test('never rewrites a returning reader choice back to the default while hydrating', async ({ page }) => {
@@ -212,7 +305,7 @@ test.describe('a reader can retype the page without losing it', () => {
     await page.goto(articleHref((await newest()).incident))
 
     // Act — the checked radio is the signal that React has hydrated and had its say.
-    await page.getByText('Reading options').click()
+    await page.getByRole('button', { name: 'Reading options' }).click()
     await expect(page.getByRole('radio', { name: 'Larger' })).toBeChecked()
     const writes = await page.evaluate(() => window.__attributeWrites)
 
@@ -233,7 +326,7 @@ test.describe('a reader can retype the page without losing it', () => {
   test('has no axe-detectable violations with the reading menu open', async ({ page }) => {
     // Arrange
     await page.goto(articleHref((await newest()).incident))
-    await page.getByText('Reading options').click()
+    await page.getByRole('button', { name: 'Reading options' }).click()
 
     // Act — the radios only enter the accessibility tree once the disclosure is open, so
     // the site-wide scan above never sees them.
@@ -251,7 +344,7 @@ test.describe('a reader can retype the page without losing it', () => {
     await otherTab.goto(href)
 
     // Act — the choice is made in the FIRST tab only.
-    await page.getByText('Reading options').click()
+    await page.getByRole('button', { name: 'Reading options' }).click()
     await page.getByRole('radio', { name: 'Sans-serif' }).check()
 
     // Assert — `storage` fires only in the tabs that did NOT write, so this is the path the
@@ -259,7 +352,7 @@ test.describe('a reader can retype the page without losing it', () => {
     // until a hard reload.
     await expect(otherTab.locator('.column-text').first()).toHaveCSS('font-family', /system-ui/)
     // Its menu has to agree too. A stale dot beside live prose is its own bug.
-    await otherTab.getByText('Reading options').click()
+    await otherTab.getByRole('button', { name: 'Reading options' }).click()
     await expect(otherTab.getByRole('radio', { name: 'Sans-serif' })).toBeChecked()
     await otherTab.close()
   })

@@ -418,6 +418,14 @@ by an inline script **before first paint**, and `app/globals.css` turns them int
 `--reading-family` and `--reading-scale`. Nothing reflows on load, which keeps
 the no-motion rule above true for a returning reader as well as a new one.
 
+The menu itself is a `popover`, so Escape and a click anywhere outside close it
+and the panel floats over the page rather than pushing the article down. It hangs
+under its button on CSS anchor positioning; where that is missing — Safari before
+18.2 — the browser centres the panel in the viewport instead, which is a menu
+that reads as a dialog. That is the accepted degradation, and the better of the
+two, because this masthead does not stick and a hand-pinned panel would drift
+away from its own button on the first scroll.
+
 The size knob moves **inherited** type only: prose, deks, pull quotes. Code
 excerpts and the masthead set their size in `rem` and stay put — a scaled code
 line only lengthens a horizontal scroll the reader never asked for, and its line
