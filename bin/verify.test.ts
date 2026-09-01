@@ -19,21 +19,29 @@ describe('the verifier command reports its verdict through its exit code', () =>
   let sha: string
 
   beforeAll(() => {
-    // Arrange: a throwaway repo with one commit at a known instant
+    // Arrange: an upstream with one commit at a known instant, and a clone of it.
+    // The clone is what the CLI is pointed at, because preflight refuses a
+    // directory with no origin and no remote-tracking branch — which is what a
+    // bare `git init` is.
     dir = mkdtempSync(join(tmpdir(), 'sourceburg-cli-'))
+    const upstream = join(dir, 'upstream')
     repoDir = join(dir, 'repo')
-    execFileSync('git', ['init', '-q', '-b', 'main', repoDir])
-    const git = (...args: string[]) =>
-      execFileSync('git', ['-C', repoDir, ...args], {
+    execFileSync('git', ['init', '-q', '-b', 'main', upstream])
+    const gitIn = (cwd: string, ...args: string[]) =>
+      execFileSync('git', ['-C', cwd, ...args], {
         encoding: 'utf8',
         env: { ...process.env, GIT_COMMITTER_DATE: '2026-05-18T09:41:25+10:00', GIT_AUTHOR_DATE: '2026-05-18T09:41:25+10:00' },
       })
-    git('config', 'user.email', 'test@example.invalid')
-    git('config', 'user.name', 'Test')
-    writeFileSync(join(repoDir, 'a.ts'), 'x\n')
-    git('add', 'a.ts')
-    git('commit', '-q', '-m', 'the anchor')
-    sha = git('rev-parse', 'HEAD').trim()
+    gitIn(upstream, 'config', 'user.email', 'test@example.invalid')
+    gitIn(upstream, 'config', 'user.name', 'Test')
+    writeFileSync(join(upstream, 'a.ts'), 'x\n')
+    gitIn(upstream, 'add', 'a.ts')
+    gitIn(upstream, 'commit', '-q', '-m', 'the anchor')
+    sha = gitIn(upstream, 'rev-parse', 'HEAD').trim()
+
+    execFileSync('git', ['clone', '-q', upstream, repoDir])
+    // The fact-set names o/n, so origin has to be o/n or preflight stops there.
+    gitIn(repoDir, 'remote', 'set-url', 'origin', 'git@github.com:o/n.git')
 
     const incident = {
       id: 'a-story', signal: 'git-trace',
