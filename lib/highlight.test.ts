@@ -65,7 +65,7 @@ describe('no renderer hands raw HTML to React', () => {
     // `codeToTokens` exists so that never has to happen; this is what keeps it true after
     // the next edit.
     //
-    // `app/layout.tsx` is the one allowed site, and it is allowed by PATH so that adding
+    // `app/layout.tsx` is the one allowed site, and it is allowed by PATH and COUNT so that adding
     // a second is a test failure rather than a judgment call. What lives there is the
     // pre-paint script that applies a reader's stored font and size: a frozen literal
     // built from this repo's own constants, writing into an attribute, never into markup,
@@ -74,18 +74,22 @@ describe('no renderer hands raw HTML to React', () => {
     const { execFileSync } = await import('node:child_process')
     const root = join(import.meta.dirname, '..')
 
-    // Act — grep exits 1 when it matches nothing, which is a passing case here, so the
-    // throw is caught and read as an empty result rather than as a broken test.
+    // Act — one line per OCCURRENCE, not per file. `-l` would name `app/layout.tsx` once no
+    // matter how many times it matched, so a second script added right beside the first would
+    // have slipped through the allowlist below; `-o` with `-H` prints every hit. grep exits 1
+    // when it matches nothing, which is a passing case here, so the throw is caught and read
+    // as an empty result rather than as a broken test.
     let hits: string[]
     try {
       hits = execFileSync(
         'grep',
-        ['-rl', '-E', String.raw`dangerouslySetInnerHTML\s*[=:]`, '--include=*.ts', '--include=*.tsx', 'app', 'components', 'lib', 'bin'],
+        ['-rHo', '-E', String.raw`dangerouslySetInnerHTML\s*[=:]`, '--include=*.ts', '--include=*.tsx', 'app', 'components', 'lib', 'bin'],
         { cwd: root, encoding: 'utf8' },
       )
         .trim()
         .split('\n')
         .filter((line) => line !== '')
+        .map((line) => line.slice(0, line.indexOf(':')))
     } catch {
       hits = []
     }
