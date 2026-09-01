@@ -265,3 +265,76 @@ each payload's shape ("specifying an exact headline the article was to carry")
 without restating its content. One sample, not a result.
 
 **Depends on / blocked by:** Nothing. The dated half depends on session 3.
+
+---
+
+## 7. The detector's signal set, measured before it is written
+
+**Status:** open, and the measurement is done. Session 3 builds the automatic
+collector; the first thing it builds is the **detector**, and the signal set
+below is not the one incident #1 suggested.
+
+Incident #1 was hand-picked — `selection.reason` says so: `'first incident,
+hand-picked to exercise every probe kind'`. It is a sample of one, chosen for
+probe coverage rather than by any signal, so "this shape makes a good story"
+says nothing about how often the shape occurs. That was measured read-only over
+`react-hook-form` `origin/master`, 24 months to 2026-08-31 (`911f8467`):
+
+| signal | hits / 24 months |
+|---|---|
+| a `Revert "` commit | **18** (66 all time) |
+| + target resolves, gap > 1 day | **10** |
+| a sibling revert the same day | 10 |
+| a test-only commit within 24h | 8 |
+| the reverted subject names an issue it closed | 3 |
+| **all three of the last — incident #1's exact shape** | **1** |
+
+**The conjunction fires once in two years, and that once is the incident that
+was picked by hand.** A detector filtering on it finds nothing and looks broken.
+
+**So: filter on one signal, rank on the rest.** The gate is a revert whose
+target resolves and whose gap exceeds a day — **10 candidates, one every ~10
+weeks**, a publishable cadence for a single repo. Sibling revert, test-only
+follow-up, and later thread activity become score, not gate. Incident #1 still
+ranks first: it scores on all three.
+
+**Two corrections to the signals themselves:**
+
+1. **"Names a closed issue" is measuring the wrong text.** It fires 3/18 only
+   because it greps the commit subject, and this repo's subjects carry a PR
+   number (`(#13420)`) rather than `closes #N` — the issue link lives in the PR
+   body. Resolve it through `gh`, or drop it. As written it is a prose match
+   wearing a semantic label.
+2. **A gap under a day is a different story.** Three of the 18 are 0.1d, 0.1d,
+   0.4d: landed and pulled the same hour, which is a CI failure, not a fix that
+   lived in the wild for eight days. Keep it in its own bucket rather than
+   widening the threshold to swallow it.
+
+**Reproduce:** `git log origin/master --grep='^Revert "' --since='24 months ago'`
+for the base count; the cluster columns come from resolving each revert's target
+by exact subject match and walking the 24h window after it. Deliberately not
+committed as a script — the detector is the real artifact and a throwaway in the
+repo would be scaffolding for it.
+
+**Depends on / blocked by:** Nothing. This is input to session 3, not a blocker.
+
+---
+
+## 8. The prose column count has no test
+
+**Status:** open, small. Test-plan path E5 ("the prose column count does not
+respond to viewport", 3-4 → 2 → 1 across 1440 / 768 / 375) is the one planned
+path that shipped nothing. The behaviour is correct and was checked by eye at
+all three widths; nothing would catch a regression.
+
+Not urgent: a wrong column count is ugly, never wrong or unsafe, and the two
+column bugs found so far (the aftermath band shredding a sentence in
+`columns-4`, the diff box cut to a 300px track) were both found by looking at
+the page rather than by a count assertion. A count assertion would have caught
+neither.
+
+**Do it as one assertion in the existing E2E**, reading
+`getComputedStyle(el).columnCount` on the prose container in the test that
+already runs at all three viewports — not a new spec file.
+
+**Depends on / blocked by:** Nothing.

@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { highlightExcerpt, languageFor } from './highlight'
@@ -53,5 +55,33 @@ describe('code is printed in two tones, because the palette has five colours', (
     expect(languageFor('LICENSE')).toBe('text')
     expect(languageFor('src/a.ts')).toBe('ts')
     await expect(highlightExcerpt('anything at all', 'LICENSE', 1)).resolves.toHaveLength(1)
+  })
+})
+
+describe('no component hands raw HTML to React', () => {
+  it('finds no dangerouslySetInnerHTML in any source file', async () => {
+    // Arrange — Shiki's `codeToHtml` returns a string of HTML, and the one obvious way
+    // to render it is the one prop that turns model-adjacent text into live markup.
+    // `codeToTokens` exists so that never has to happen; this is what keeps it true
+    // after the next edit. Matches the JSX attribute and the object property, never
+    // the three comments that explain the absence.
+    const { execFileSync } = await import('node:child_process')
+    const root = join(import.meta.dirname, '..')
+
+    // Act — grep exits 1 when it matches nothing, which is the PASSING case here, so
+    // the throw is caught and read as an empty result rather than as a broken test.
+    let hits: string
+    try {
+      hits = execFileSync(
+        'grep',
+        ['-rn', '-E', String.raw`dangerouslySetInnerHTML\s*[=:]`, '--include=*.ts', '--include=*.tsx', 'app', 'components', 'lib', 'bin'],
+        { cwd: root, encoding: 'utf8' },
+      ).trim()
+    } catch {
+      hits = ''
+    }
+
+    // Assert
+    expect(hits).toBe('')
   })
 })
