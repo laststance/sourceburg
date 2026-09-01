@@ -1,11 +1,12 @@
 import Link from 'next/link'
 
 import { assignCitationNumbers } from '../lib/citations'
+import { aftermathKnownAt } from '../lib/facts'
 import { datelineOf } from '../lib/dates'
 import { articleHref } from '../lib/links'
 
 import { AttributionFooter } from './AttributionFooter'
-import { Block, Cites, isRailBlock } from './Blocks'
+import { Block, Cites, isFullWidthBlock, isRailBlock } from './Blocks'
 import { KeyArtPlate } from './KeyArtPlate'
 
 import type { BlockContext } from './Blocks'
@@ -69,8 +70,9 @@ export function ArticleView({ incident, article }: { incident: Incident; article
   const { ordered, numberOf } = assignCitationNumbers(article)
   const context: BlockContext = { incident, numberOf, anchorBase: '' }
 
-  const flow = article.blocks.filter((block) => !isRailBlock(block))
+  const flow = article.blocks.filter((block) => !isRailBlock(block) && !isFullWidthBlock(block))
   const rail = article.blocks.filter(isRailBlock)
+  const fullWidth = article.blocks.filter(isFullWidthBlock)
 
   return (
     <>
@@ -78,7 +80,10 @@ export function ArticleView({ incident, article }: { incident: Incident; article
         <Headline incident={incident} article={article} />
         <Dateline incident={incident} />
 
-        <section className="mt-6 grid gap-8 lg:grid-cols-[3fr_1fr]">
+        {/* `minmax(0, …)` on the text column and a floor under the rail: a bare `fr`
+            track takes its min-content width from the longest unbreakable thing in it,
+            and one permalink is enough to crush the rail to a few words wide. */}
+        <section className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(17rem,1fr)] lg:items-start">
           <div>
             <h2 className="mb-3 font-display text-sm tracking-widest uppercase">Breaking</h2>
             {/* Multi-column below the heading; ragged and single-column under 768px. */}
@@ -98,13 +103,21 @@ export function ArticleView({ incident, article }: { incident: Incident; article
           )}
         </section>
 
+        {fullWidth.map((block, index) => (
+          <Block key={index} block={block} context={context} />
+        ))}
+
         {article.aftermath.length === 0 ? null : (
           <section className="mt-8 -mx-4 bg-paper-tint px-4 py-6 sm:-mx-6 sm:px-6">
             <h2 className="mb-3 font-display text-sm tracking-widest uppercase">
               What we know now{' '}
-              <span className="font-mono text-xs normal-case">(written later: {datelineOf(article.updatedAt)})</span>
+              <span className="font-mono text-xs normal-case">
+                (written later: {datelineOf(aftermathKnownAt(incident, article))})
+              </span>
             </h2>
-            <div className="md:columns-2 md:gap-8 lg:columns-4">
+            {/* One short entry in four columns breaks a sentence into word-wide slivers,
+                so the band only goes multi-column when there is enough to fill one. */}
+            <div className={article.aftermath.length > 1 ? 'md:columns-2 md:gap-8 lg:columns-3' : 'max-w-[70ch]'}>
               {article.aftermath.map((entry, index) => (
                 <p key={index} className="column-text mb-4 font-serif text-base leading-7">
                   {entry.text}

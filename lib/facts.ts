@@ -151,3 +151,26 @@ export function incidentRefIndex(incident: Incident): Map<string, FactRefParsed[
   for (const entry of incident.revealedLater) index.set(revealedRefFor(entry), 'revealed')
   return index
 }
+
+/**
+ * When the aftermath's facts became known: the latest `revealedLater[].at` the
+ * aftermath actually cites, falling back to `updatedAt`.
+ *
+ * The design dates the tinted band from `Article.updatedAt`, and that is right when a
+ * republish adds the aftermath later. It is wrong when the article shipped with one
+ * already in it: `updatedAt` then equals `publishedAt`, and the band reads
+ * "(WRITTEN LATER: <the day it was published>)" — a claim the page itself disproves
+ * two lines down. The revealed dates are verified facts, so this prefers them.
+ *
+ * @param incident - the fact-set the aftermath refs resolve against
+ * @param article - the article whose aftermath is being dated
+ * @returns an ISO timestamp; `article.updatedAt` when no aftermath ref resolves
+ * @example aftermathKnownAt(incident, article) // => '2026-05-28T12:26:34Z'
+ */
+export function aftermathKnownAt(incident: Incident, article: Article): string {
+  const cited = new Set(article.aftermath.map((entry) => entry.ref))
+  const dates = incident.revealedLater
+    .filter((entry) => cited.has(revealedRefFor(entry)))
+    .map((entry) => entry.at)
+  return dates.length === 0 ? article.updatedAt : dates.reduce((a, b) => (a > b ? a : b))
+}

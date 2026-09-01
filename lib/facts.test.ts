@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { datedFacts, parseFactRef } from './facts'
-import type { Incident } from './schema'
+import { aftermathKnownAt, datedFacts, parseFactRef, revealedRefFor } from './facts'
+import type { Article, Incident } from './schema'
 
 const SHA = 'c6c3d87e0000000000000000000000000000abcd'
 
@@ -130,5 +130,40 @@ describe('the timeline box and the verifier count dated facts the same way', () 
     const facts = datedFacts(incident)
     // Assert: one, not three — the timelineBox precondition correctly fails
     expect(facts).toHaveLength(1)
+  })
+})
+
+describe('the aftermath band is dated by when its facts became known', () => {
+  it('uses the revealed date the aftermath cites, not the publication timestamp', () => {
+    // Arrange — an article shipped WITH its aftermath has updatedAt === publishedAt,
+    // and "(written later: <the day it was published>)" is a claim the page disproves.
+    const incident = incidentWith({
+      revealedLater: [
+        {
+          at: '2026-05-28T12:26:34Z',
+          what: 'The issue reopened.',
+          evidence: { kind: 'discussion', number: 13260, commentId: 4563957418 },
+        },
+      ] as Incident['revealedLater'],
+    })
+    const article = {
+      updatedAt: '2026-05-17T23:41:25Z',
+      aftermath: [{ text: 'Eleven days later.', ref: revealedRefFor(incident.revealedLater[0]) }],
+    } as Article
+
+    // Act
+    const dated = aftermathKnownAt(incident, article)
+
+    // Assert
+    expect(dated).toBe('2026-05-28T12:26:34Z')
+  })
+
+  it('falls back to updatedAt when there is no aftermath to date', () => {
+    // Arrange
+    const incident = incidentWith({})
+    const article = { updatedAt: '2026-06-02T00:00:00Z', aftermath: [] } as unknown as Article
+
+    // Act / Assert
+    expect(aftermathKnownAt(incident, article)).toBe('2026-06-02T00:00:00Z')
   })
 })

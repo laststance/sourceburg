@@ -1,3 +1,4 @@
+import { diffLines, diffSide } from '../lib/diff'
 import { datedFacts, parseFactRef } from '../lib/facts'
 import { highlightExcerpt } from '../lib/highlight'
 import { permalinkFor, sourceLabelFor } from '../lib/links'
@@ -155,15 +156,6 @@ function PersonQuoteBox({ blockRef, context }: { blockRef: string; context: Bloc
   )
 }
 
-/** One side of a unified hunk, reconstructed. Context lines belong to both sides. */
-function diffSide(hunk: string, side: '-' | '+'): string[] {
-  return hunk
-    .split('\n')
-    .filter((line) => !line.startsWith('@@') && !line.startsWith('---') && !line.startsWith('+++'))
-    .filter((line) => line.startsWith(side) || !(line.startsWith('-') || line.startsWith('+')))
-    .map((line) => line.slice(line.startsWith(side) ? 1 : 0))
-}
-
 /**
  * Before and after, stacked. Removed and added are marked typographically — the sign
  * and the weight — never by a coloured fill: the palette has one spot colour and it
@@ -175,9 +167,10 @@ function DiffBox({ context }: { context: BlockContext }) {
   // the renderer runs this cannot be on disk. It still omits rather than framing air.
   if (diff === null) return null
 
+  const parsed = diffLines(diff.hunk)
   const sides = [
-    { label: `BEFORE · ${diff.beforeSha.slice(0, SHORT_SHA_LENGTH)}`, lines: diffSide(diff.hunk, '-'), removed: true },
-    { label: `AFTER · ${diff.afterSha.slice(0, SHORT_SHA_LENGTH)}`, lines: diffSide(diff.hunk, '+'), removed: false },
+    { label: `Before · ${diff.beforeSha.slice(0, SHORT_SHA_LENGTH)}`, lines: diffSide(parsed, 'before') },
+    { label: `After · ${diff.afterSha.slice(0, SHORT_SHA_LENGTH)}`, lines: diffSide(parsed, 'after') },
   ]
 
   return (
@@ -187,16 +180,34 @@ function DiffBox({ context }: { context: BlockContext }) {
         <div key={side.label} className="border-b border-rule last:border-b-0">
           <p className="px-3 pt-2 font-mono text-[0.7rem] tracking-wide uppercase opacity-70">{side.label}</p>
           <div className="code-scroll px-3 pt-1 pb-2">
-            <pre className="text-xs leading-5">
-              <code>
-                {side.lines.map((line, index) => (
-                  <span key={index} className={side.removed ? 'block opacity-60' : 'block font-semibold'}>
-                    <span className="inline-block w-4 select-none">{side.removed ? '-' : '+'}</span>
-                    {line}
-                  </span>
-                ))}
-              </code>
-            </pre>
+            {side.lines.length === 0 ? (
+              // A creation has no before and a deletion has no after. Say which, rather
+              // than print an empty pane the reader has to interpret.
+              <p className="font-mono text-xs italic opacity-70">the file did not exist at this revision</p>
+            ) : (
+              <pre className="text-xs leading-5">
+                <code>
+                  {side.lines.map((line, index) => (
+                    <span
+                      key={index}
+                      className={
+                        line.kind === 'removed'
+                          ? 'block opacity-55'
+                          : line.kind === 'added'
+                            ? 'block font-semibold'
+                            : 'block'
+                      }
+                    >
+                      {/* Sign and weight carry the change; there is no coloured fill. */}
+                      <span className="inline-block w-4 select-none">
+                        {line.kind === 'removed' ? '-' : line.kind === 'added' ? '+' : ' '}
+                      </span>
+                      {line.text}
+                    </span>
+                  ))}
+                </code>
+              </pre>
+            )}
           </div>
         </div>
       ))}
@@ -212,9 +223,18 @@ function TimelineBox({ context }: { context: BlockContext }) {
   return (
     <figure className="mb-6 break-inside-avoid border border-rule p-3">
       <figcaption className="mb-2 font-display text-sm tracking-widest uppercase">Timeline</figcaption>
-      <ol className="flex flex-col gap-3 md:flex-row md:gap-0">
+      {/*
+        * Horizontal dated chart on desktop, vertical list on mobile. It runs full
+        * width rather than in the right rail: eight dated facts across a 350px rail
+        * give each entry ~40px, and the labels stack one letter wide. Full width is
+        * also the only place the design's "horizontal dated chart" is legible at all.
+        */}
+      <ol className="flex flex-col gap-2 md:flex-row md:gap-0">
         {facts.map((fact) => (
-          <li key={`${fact.at}-${fact.ref}`} className="md:flex-1 md:border-l md:border-rule md:px-3 md:first:border-l-0 md:first:pl-0">
+          <li
+            key={`${fact.at}-${fact.ref}`}
+            className="border-t border-rule pt-2 first:border-t-0 first:pt-0 md:flex-1 md:border-t-0 md:border-l md:px-3 md:pt-0 md:first:border-l-0 md:first:pl-0"
+          >
             <p className="font-mono text-[0.7rem] tracking-wide uppercase opacity-70">{fact.at.slice(0, 10)}</p>
             <p className="font-serif text-sm leading-5">
               {fact.label}
@@ -227,9 +247,14 @@ function TimelineBox({ context }: { context: BlockContext }) {
   )
 }
 
-/** Which blocks the desktop composition moves into the right rail. */
+/** Which block the desktop composition moves into the right rail: the pull quote. */
 export function isRailBlock(block: Article['blocks'][number]): boolean {
-  return block.type === 'personQuote' || block.type === 'timelineBox'
+  return block.type === 'personQuote'
+}
+
+/** The timeline runs full width under the breaking half, not in the rail. See TimelineBox. */
+export function isFullWidthBlock(block: Article['blocks'][number]): boolean {
+  return block.type === 'timelineBox'
 }
 
 /**
