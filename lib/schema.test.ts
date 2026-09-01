@@ -583,6 +583,15 @@ describe('an article cannot cite a fact its incident does not have', () => {
     expect(result.success).toBe(true)
   })
 
+  it('rejects a citation that is not one of the five id forms at all, without throwing', () => {
+    // Arrange: garbage reaches resolve() before parseFactRef ever sees it
+    const article = rhfArticle({ titleCites: ['not-a-ref-at-all'] })
+    // Act
+    const result = articleSchemaFor(incident).safeParse(article)
+    // Assert
+    expect(result.success).toBe(false)
+  })
+
   it('rejects an article whose incidentId names a different incident than the fact-set it is checked against', () => {
     // Arrange
     const article = rhfArticle({ incidentId: 'some-other-story' })
