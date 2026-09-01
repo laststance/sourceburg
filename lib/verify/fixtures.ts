@@ -22,6 +22,11 @@ export const FIX_AT = '2026-05-09T02:02:12Z'
 export const REVERT_AT = '2026-05-17T23:01:00Z'
 export const REFIX_AT = '2026-08-07T10:05:00Z'
 
+/** The three commit subjects, named so the fixture and its probe output cannot drift. */
+export const FIX_SUBJECT = 'fix #13260'
+export const REVERT_SUBJECT = 'Revert "fix #13260"'
+export const ANCHOR_SUBJECT = 'test(useFieldArray): regression coverage'
+
 export const REPO = 'react-hook-form/react-hook-form'
 export const QUOTED_PATH = 'src/logic/getFieldArrayParentNames.ts'
 
@@ -50,9 +55,9 @@ export function incidentFixture(overrides: Record<string, unknown> = {}): Incide
     anchorSha: ANCHOR,
     knownAt: KNOWN_AT,
     commits: [
-      { sha: FIX, committedAt: FIX_AT, subject: 'fix #13260' },
-      { sha: REVERT, committedAt: REVERT_AT, subject: 'Revert "fix #13260"' },
-      { sha: ANCHOR, committedAt: KNOWN_AT, subject: 'test(useFieldArray): regression coverage' },
+      { sha: FIX, committedAt: FIX_AT, subject: FIX_SUBJECT },
+      { sha: REVERT, committedAt: REVERT_AT, subject: REVERT_SUBJECT },
+      { sha: ANCHOR, committedAt: KNOWN_AT, subject: ANCHOR_SUBJECT },
     ],
     discussions: [
       {
@@ -136,6 +141,10 @@ export function passingProbes() {
     { id: `gitCommitDate:${FIX}`, status: 'ok' as const, stdout: `${FIX_AT}\n` },
     { id: `gitCommitDate:${REVERT}`, status: 'ok' as const, stdout: `${REVERT_AT}\n` },
     { id: `gitCommitDate:${REFIX}`, status: 'ok' as const, stdout: `${REFIX_AT}\n` },
+    // One per commit, and none for REFIX: the aftermath cites a sha, not a subject.
+    { id: `gitCommitSubject:${FIX}`, status: 'ok' as const, stdout: `${FIX_SUBJECT}\n` },
+    { id: `gitCommitSubject:${REVERT}`, status: 'ok' as const, stdout: `${REVERT_SUBJECT}\n` },
+    { id: `gitCommitSubject:${ANCHOR}`, status: 'ok' as const, stdout: `${ANCHOR_SUBJECT}\n` },
     { id: `gitBlob:${FIX}:${QUOTED_PATH}`, status: 'ok' as const, stdout: BLOB },
     {
       id: `ghIssue:${REPO}#13260`,

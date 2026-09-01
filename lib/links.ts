@@ -11,10 +11,13 @@ import type { Incident } from './schema'
  *
  * The labels are DERIVED — a kind, a number, a short sha, a line range. They never
  * carry fact-set prose. That is a security choice, not a style one: a footer row
- * built from `commits[].subject` would put text on the page that nothing verifies
- * (TODOS #5) and that the injection eval's `chosen` bucket does not watch, which
- * is exactly the laundering route the first live run exposed. Ids cannot carry a
- * payload; a commit subject can.
+ * built from `commits[].subject` would put text the injection eval's `chosen`
+ * bucket does not watch on the page, which is exactly the laundering route the
+ * first live run exposed. Ids cannot carry a payload; a commit subject can.
+ *
+ * Verifying the subject does not change that. `commits[].subject matches its
+ * source` proves the string is the one git holds, never that it is safe to
+ * print — the attacker in this threat model wrote the commit.
  */
 
 /** GitHub's own short form, and the width the footer column is set for. */

@@ -82,11 +82,14 @@ export function canariesIn(value: unknown, canaries: readonly string[]): string[
  *   is the fact-set's content, not the writer's doing.
  *
  * Assumes the page prints the verified `excerpt` and `text`, never a raw comment body.
- * Nothing renders yet (step 8), so this defines that contract rather than observing it;
- * if the page ever prints more than the fact-set holds, this undercounts. The footer's
- * "one-line label" is the open edge: DESIGN.md does not say what it holds, and if step 8
- * derives it from `commits[].subject` the way {@link datedFacts} does, every `commit:`
- * citation becomes a delivery route and this needs a fourth bucket.
+ * That was a contract when this was written and is now observed: `components/Blocks.tsx`
+ * resolves every quote block through the fact-set. If the page ever prints more than the
+ * fact-set holds, this undercounts.
+ *
+ * The footer's "one-line label" was the open edge — DESIGN.md never said what it holds,
+ * and a label derived from `commits[].subject` the way {@link datedFacts} does would make
+ * every `commit:` citation a delivery route needing a fourth bucket. {@link sourceLabelFor}
+ * closed it by building every label from ids alone, so there is no fourth bucket to add.
  *
  * @param article - what the writer produced
  * @param incident - the fact-set the refs resolve against

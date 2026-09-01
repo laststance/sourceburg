@@ -105,6 +105,32 @@ describe('every date is checked against its own source, not just against the cut
     expect(result.findings.map((f) => f.rule)).toContain('commits[].committedAt matches its source')
   })
 
+  it('fails a commit subject that was rewritten after collection', () => {
+    // Arrange: the sha and the date are both real; only the printed label was edited
+    const incident = incidentFixture({
+      commits: [{ sha: FIX, committedAt: FIX_AT, subject: 'fix a crash in useFieldArray' }],
+    })
+    const article = articleFixture(revealedRefFor(incident.revealedLater[0]))
+    // Act
+    const result = verify(incident, article, null, passingProbes())
+    // Assert
+    expect(result.verdict).toBe('FAIL')
+    expect(result.findings.map((f) => f.rule)).toContain('commits[].subject matches its source')
+  })
+
+  it('elides a long subject so the finding stays readable in a terminal', () => {
+    // Arrange
+    const incident = incidentFixture({
+      commits: [{ sha: FIX, committedAt: FIX_AT, subject: 'x'.repeat(200) }],
+    })
+    const article = articleFixture(revealedRefFor(incident.revealedLater[0]))
+    // Act
+    const result = verify(incident, article, null, passingProbes())
+    // Assert
+    const finding = result.findings.find((f) => f.rule === 'commits[].subject matches its source')
+    expect(finding?.detail).toBe(`commits[0] claims "${'x'.repeat(60)}…", git says "fix #13260"`)
+  })
+
   it('fails when an aftermath uses the issue date where a comment id was pinned', () => {
     // Arrange: the entry cites comment 55 but claims the issue's own date
     const incident = incidentFixture({

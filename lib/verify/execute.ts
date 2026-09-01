@@ -97,6 +97,20 @@ export function commandFor(spec: ProbeSpec, repoDir: string): { file: string; ar
         file: 'git',
         args: ['-C', repoDir, 'show', '-s', '--date=iso-strict-local', '--format=%cd', `${spec.sha}^{commit}`],
       }
+    case 'gitCommitSubject':
+      /*
+       * `%s` prints the subject alone. `git show <sha>` would print the whole
+       * commit header, where the author email addresses live, and those are on
+       * the never-rendered list. Same `^{commit}` peel as the date probe.
+       *
+       * The subject is the one collected fact that reaches the reader without
+       * being a sha, a date, a URL, or a quoted line: `datedFacts` uses it as
+       * the label of every timeline row.
+       */
+      return {
+        file: 'git',
+        args: ['-C', repoDir, 'show', '-s', '--format=%s', `${spec.sha}^{commit}`],
+      }
     case 'gitBlob':
       // The BLOB form of `git show`. `git show <sha>` would print a commit header
       // carrying author email addresses, which are on the never-rendered list.

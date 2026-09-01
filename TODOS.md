@@ -135,64 +135,61 @@ written against a real repo.
 
 ---
 
-## 5. Three facts nothing verifies: `spdxLicense`, `defaultBranch`, `commits[].subject`
+## 5. Two repo facts nothing verifies: `spdxLicense` and `defaultBranch`
 
-**What:** Give the probe vocabulary a way to check `incident.repo.spdxLicense`,
-`incident.repo.defaultBranch`, and `incident.commits[].subject` against their
-sources, the way every sha, date, and quoted line is already checked.
+**`commits[].subject` was the third, and it was closed on 2026-09-01.** What it
+cost, recorded because the estimate in this item was the reason the shape was
+chosen: a `gitCommitSubject` probe kind (`git show -s --format=%s <sha>^{commit}`,
+the same command the collector was already running by hand), one `add()` in
+`plan()`, one rule in `verify()`, three fixture stdouts, two tests. The widening
+of `gitCommitDate` was not attempted; the six emission sites were counted first
+(`anchorSha`, `commits[i]`, `codeQuotes[i].atSha`, `diff.beforeSha`,
+`diff.afterSha`, `revealedLater[i]`) and only one of them has a subject, so the
+extra `git show` per commit is the cheaper end after all.
 
-**Why:** Two separate reasons, and the second one is worse.
+The change paid for itself somewhere this item did not predict: `bin/collect.ts`
+had its own copy of that command, listed in its header as deliberately outside
+the probe vocabulary. It now goes through `commandFor` like everything else, so
+the collector and the verifier can no longer disagree about what a subject is.
+Proved end to end rather than by fixture: re-collecting incident #1 produced a
+byte-identical fact-set (15 fetches, `fetchedAt` aside), it verifies PASS against
+a real clone, and hand-editing one subject FAILs with
+`commits[].subject matches its source`.
 
-`spdxLicense` has a policy attached: `pureRules` refuses to publish a code
+**Still open, and the reason this item is not deleted:**
+
+`spdxLicense` has a policy attached — `pureRules` refuses to publish a code
 excerpt from a repo whose SPDX id is not in `EXCERPTABLE_LICENSES`. That gate
 reads a string nothing verifies. `bin/collect.ts` fetches it from
-`gh api repos/{nwo}`, so a collected fact-set is honest — but a fact-set is a
+`gh api repos/{nwo}`, so a collected fact-set is honest, but a fact-set is a
 committed artifact that a later run parses, and an edited `spdxLicense: "MIT"`
 on a proprietary repo would pass every probe and publish the excerpt.
+`defaultBranch` is milder: `licenseHref` builds a link from it, so a wrong value
+is a 404 rather than a false claim.
 
-`commits[].subject` is worse because it **reaches the reader**.
-`datedFacts()` in `lib/facts.ts:92` pushes it as the `label` of every timeline
-entry, so a commit subject is rendered text presented as fact on a site whose
-whole claim is that every rendered fact was checked against its source.
-`spdxLicense` at least gates publication; `subject` just gets printed.
-Confirmed by grep: nothing in `plan.ts`, `verify.ts`, `probe.ts`, or
-`execute.ts` reads `commits[].subject`.
+Both come from one `gh api repos/{nwo}` call, so both close with one `ghRepo`
+probe kind. It needs a verdict this item does not have: GitHub returns
+`license: null` for an unlicensed repo and `NOASSERTION` for a LICENSE file it
+cannot identify, and the collector currently maps both to `""`. Neither is in
+`EXCERPTABLE_LICENSES`, so today's policy is already correct for both — the
+question is only what the new rule compares against.
 
-**Pros:** Closes the last gap between "every fact is verified" and what the
-code actually does. `commandFor` already speaks `gh api` and `git show`.
+**A second half is open too, and it is not verification.** A commit subject is
+now checked against its source, but it is not screened for email addresses the
+way `codeQuotes[].text` and `quotes[].excerpt` are, and it renders in the
+timeline. The screen was deliberately not added in the same pass:
+`EMAIL_PATTERN` exists to reject npm specifiers, and a subject plausibly carries
+`main@v2.beta`, which clears the "first label starts with a letter" guard and the
+two-letter TLD. A false positive there is worse than in a code excerpt, because
+the escape hatch differs: an excerpt has "pick a different one", a subject does
+not — the only fix is dropping a commit the story may need. **Do not add the
+screen without a false-positive corpus of real subjects first.**
 
-**Cons — and the two shapes are not equally cheap:**
-
-- *A new `gitCommitSubject` kind* (`git show -s --format=%s <sha>^{commit}`)
-  is purely additive: one case in `ProbeSpec` / `probeId` / `commandFor` /
-  `preflight`, one `add()` in `plan()`, one rule in `verify()`, one fixture
-  entry per commit. It costs one extra git invocation per commit.
-- *Widening `gitCommitDate` to `--format=%cd%n%s`* spends no extra process, but
-  `plan()` emits `gitCommitDate` from **six** call sites and only one of them
-  (`commits[i]`) has a subject in the schema — `anchorSha`, `codeQuotes[].atSha`,
-  `diff.beforeSha`, `diff.afterSha`, and `revealedLater[].evidence.sha` would all
-  start carrying a second line nothing reads. It also changes `committerDate()`'s
-  `stdout.trim()` into a split, and every `gitCommitDate` fixture stdout with it.
-
-So the extra `git show` is probably the cheaper end of it, despite being the
-one that adds a probe. Both touch `ProbeSpec`, `probeId`, `commandFor`,
-`plan()`, `verify()`, and their tests — the four files step 4 locked down —
-and `plan()`'s "every fact contributes a probe" test has to grow a case. The
-repo rule still needs a verdict for a repo with no license at all (GitHub
-returns `null`, and `NOASSERTION` is not the same as unlicensed).
-
-**Context:** `spdxLicense` was deliberately deferred while building the
-collector (step 6, 2026-09-01): a `ghRepo` probe kind that `plan()` never
-emits would be dead vocabulary, so the collector calls `gh api repos/{nwo}`
-directly and says so in its header comment. `commits[].subject` was found
-straight after, reviewing that same step — the collector fetches it correctly
-(`git show -s --format=%s`, which prints the subject alone and never the
-commit header where author emails live), so no fact-set is dishonest today;
-the hole is in the verifier's coverage.
-
-**Depends on / blocked by:** Nothing. Cheapest to do next time `plan()` is open.
+**Depends on / blocked by:** Nothing. The `ghRepo` half is cheapest next time
+`plan()` is open; the email half is blocked on the corpus, not on code.
 
 ---
+
 
 ## 6. What the injection eval cannot see
 

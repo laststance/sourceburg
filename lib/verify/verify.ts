@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto'
 
 import { assignCitationNumbers } from '../citations'
-import { MAX_QUOTED_LINES_PER_PATH, MAX_QUOTED_RATIO, PROSE_CHARS_PER_LINE, EXCERPTABLE_LICENSES } from '../constants'
+import {
+  MAX_QUOTED_LINES_PER_PATH,
+  MAX_QUOTED_RATIO,
+  PROSE_CHARS_PER_LINE,
+  EXCERPTABLE_LICENSES,
+  FINDING_DETAIL_CHARS,
+} from '../constants'
 import { articleRefs } from '../facts'
 import { articleSchemaFor } from '../schema'
 import { identityOf } from './plan'
@@ -67,6 +73,18 @@ export function countProseLines(article: Article): number {
   return lines
 }
 
+/**
+ * A quoted, length-capped string for a finding detail. Subjects run long where
+ * dates are twenty characters, and a finding nobody can read in a terminal is a
+ * finding nobody acts on.
+ * @param text - the value to show
+ * @returns the text in quotes, truncated with an ellipsis past the cap
+ * @example elide('a'.repeat(80)) // => '"aaa…"' (60 a's, then the ellipsis)
+ */
+function elide(text: string): string {
+  return JSON.stringify(text.length > FINDING_DETAIL_CHARS ? `${text.slice(0, FINDING_DETAIL_CHARS)}…` : text)
+}
+
 const fail = (rule: string, detail: string): Finding => ({ verdict: 'FAIL', rule, detail })
 const inconclusive = (rule: string, detail: string): Finding => ({
   verdict: 'INDETERMINATE',
@@ -122,6 +140,12 @@ export function verify(
     return stdout === null ? null : stdout.trim()
   }
 
+  /** Subject line for a sha, or null when the probe already produced a finding. */
+  const commitSubject = (sha: string, rule: string): string | null => {
+    const stdout = stdoutOf({ kind: 'gitCommitSubject', sha }, rule)
+    return stdout === null ? null : stdout.trim()
+  }
+
   const repo = incident.repo.nameWithOwner
 
   // ---- every sha resolves, and every stored date matches its own source -------
@@ -142,6 +166,20 @@ export function verify(
     if (date !== null && date !== commit.committedAt) {
       findings.push(
         fail(rule, `commits[${i}] claims ${commit.committedAt}, git says ${date}`),
+      )
+    }
+
+    // Checked because it is PRINTED: `datedFacts` makes the subject the label of
+    // a timeline row, so it is the one collected string that reaches a reader
+    // without being a sha, a date, a URL, or a quoted line.
+    const subjectRule = 'commits[].subject matches its source'
+    const subject = commitSubject(commit.sha, subjectRule)
+    if (subject !== null && subject !== commit.subject) {
+      findings.push(
+        fail(
+          subjectRule,
+          `commits[${i}] claims ${elide(commit.subject)}, git says ${elide(subject)}`,
+        ),
       )
     }
   })

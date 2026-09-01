@@ -21,3 +21,6 @@ export const EXCERPTABLE_LICENSES = [
 
 /** The production origin, no trailing slash. Absolute URLs in the feed need one. */
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sourceburg.vercel.app'
+
+/** How much of a long value a verification finding prints before eliding it. */
+export const FINDING_DETAIL_CHARS = 60

@@ -13,6 +13,7 @@
  * union collapses the discriminant and stops narrowing. */
 export type ProbeSpec =
   | { kind: 'gitCommitDate'; sha: string }
+  | { kind: 'gitCommitSubject'; sha: string }
   | { kind: 'gitBlob'; sha: string; path: string }
   | { kind: 'gitDiff'; beforeSha: string; afterSha: string; path: string }
   | { kind: 'ghIssue'; repo: string; number: number }
@@ -36,6 +37,8 @@ export function probeId(request: ProbeSpec): string {
   switch (request.kind) {
     case 'gitCommitDate':
       return `gitCommitDate:${request.sha}`
+    case 'gitCommitSubject':
+      return `gitCommitSubject:${request.sha}`
     case 'gitBlob':
       return `gitBlob:${request.sha}:${request.path}`
     case 'gitDiff':

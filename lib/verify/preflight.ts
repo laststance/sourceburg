@@ -48,6 +48,7 @@ export function shasOf(incident: Incident): string[] {
   for (const request of plan(incident)) {
     switch (request.kind) {
       case 'gitCommitDate':
+      case 'gitCommitSubject':
       case 'gitBlob':
         shas.add(request.sha)
         break

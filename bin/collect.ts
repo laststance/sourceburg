@@ -39,13 +39,17 @@ import type { ProbeRequest, ProbeResult, ProbeSpec } from '../lib/verify/probe'
  *
  * 1. {@link resolveSha} — resolution is argument normalization, not a fact, and
  *    it runs before any fact is fetched. See `lib/collect.ts`.
- * 2. `git remote get-url origin` and `git show -s --format=%s` — the repo name
- *    and the commit subjects. `%s` prints the subject alone, never the commit
- *    header, which is where the author email addresses live.
+ * 2. `git remote get-url origin` — the repo name. There is no probe kind for it
+ *    because it is not a fact about the incident; it is how this run learns which
+ *    repo it is in.
  * 3. `gh api repos/{nwo}` — the default branch and the SPDX license. There is no
  *    probe kind for repo metadata and adding one that {@link plan} never emits
- *    would be dead vocabulary. The cost is recorded: `spdxLicense` is currently
- *    an unverified fact (TODOS #5).
+ *    would be dead vocabulary. The cost is recorded: `spdxLicense` and
+ *    `defaultBranch` are currently unverified facts (TODOS #5).
+ *
+ * The commit subjects used to sit in that list too. They no longer do: they are
+ * rendered text, so `gitCommitSubject` is a probe kind the verifier emits, and
+ * this file fetches them through the same `commandFor` the verifier re-runs.
  */
 
 const run = promisify(execFile)
@@ -170,7 +174,10 @@ async function main(): Promise<number> {
     .filter((number, i, all) => all.indexOf(number) === i)
 
   const specs: ProbeSpec[] = [
-    ...commitShas.map((sha): ProbeSpec => ({ kind: 'gitCommitDate', sha })),
+    ...commitShas.flatMap((sha): ProbeSpec[] => [
+      { kind: 'gitCommitDate', sha },
+      { kind: 'gitCommitSubject', sha },
+    ]),
     ...codeSpecs.flatMap((spec): ProbeSpec[] => [
       { kind: 'gitCommitDate', sha: spec.atSha },
       { kind: 'gitBlob', sha: spec.atSha, path: spec.path },
@@ -196,6 +203,7 @@ async function main(): Promise<number> {
 
   const fetchedAt = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
   const committedAt = (sha: string) => stdoutOf(probes, { kind: 'gitCommitDate', sha }, `the date of ${sha.slice(0, 8)}`).trim()
+  const subject = (sha: string) => stdoutOf(probes, { kind: 'gitCommitSubject', sha }, `the subject of ${sha.slice(0, 8)}`).trim()
 
   const contentDir = argOf('--content-dir') ?? 'content'
   const cacheDir = join(incidentDir(contentDir, id), 'cache')
@@ -206,10 +214,6 @@ async function main(): Promise<number> {
     }
     return 1
   }
-
-  const subjects = await Promise.all(
-    commitShas.map(async (sha) => (await run('git', ['-C', repoDir, 'show', '-s', '--format=%s', `${sha}^{commit}`])).stdout.trim()),
-  )
 
   const codeQuotes = codeSpecs.map((spec) => {
     const blob = stdoutOf(probes, { kind: 'gitBlob', sha: spec.atSha, path: spec.path }, `${spec.path} at ${spec.atSha.slice(0, 8)}`)
@@ -290,7 +294,7 @@ async function main(): Promise<number> {
     repo: { nameWithOwner, defaultBranch, spdxLicense },
     anchorSha,
     knownAt: committedAt(anchorSha),
-    commits: commitShas.map((sha, i) => ({ sha, committedAt: committedAt(sha), subject: subjects[i] })),
+    commits: commitShas.map((sha) => ({ sha, committedAt: committedAt(sha), subject: subject(sha) })),
     discussions,
     codeQuotes,
     diff: diffSpec === null ? null : { ...diffSpec, hunk: stdoutOf(probes, { kind: 'gitDiff', ...diffSpec }, `the diff of ${diffSpec.path}`) },

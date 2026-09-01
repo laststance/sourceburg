@@ -14,8 +14,11 @@ describe('every collected fact gets a probe, so nothing verifies by omission', (
       new Set([
         'anchorSha',
         'commits[0]',
+        'commits[0].subject',
         'commits[1]',
+        'commits[1].subject',
         'commits[2]',
+        'commits[2].subject',
         'discussions[0]',
         'discussions[0].quotes[0]',
         'codeQuotes[0]',

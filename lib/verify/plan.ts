@@ -60,9 +60,12 @@ export function plan(incident: Incident): ProbeRequest[] {
   // never appears in `commits`.
   add({ kind: 'gitCommitDate', sha: incident.anchorSha }, 'anchorSha')
 
-  incident.commits.forEach((commit, i) =>
-    add({ kind: 'gitCommitDate', sha: commit.sha }, `commits[${i}]`),
-  )
+  incident.commits.forEach((commit, i) => {
+    add({ kind: 'gitCommitDate', sha: commit.sha }, `commits[${i}]`)
+    // The subject is rendered text — it is the label of a timeline row — so it
+    // needs its own proof, not just a sha that resolves.
+    add({ kind: 'gitCommitSubject', sha: commit.sha }, `commits[${i}].subject`)
+  })
 
   incident.discussions.forEach((discussion, i) => {
     add({ kind: 'ghIssue', repo, number: discussion.number }, `discussions[${i}]`)
