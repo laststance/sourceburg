@@ -1,14 +1,13 @@
 #!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
 
+import { incidentDir, readManifest } from '../lib/publish'
 import { Article, Incident } from '../lib/schema'
 import { execute } from '../lib/verify/execute'
 import { plan } from '../lib/verify/plan'
 import { preflight } from '../lib/verify/preflight'
 import { exitCodeFor } from '../lib/verify/result'
 import { verify } from '../lib/verify/verify'
-
-import type { PreviouslyPublished } from '../lib/verify/plan'
 
 /*
  * The verifier as a command. Exit codes are the whole interface: 0 publishes, 1
@@ -27,16 +26,18 @@ async function main(): Promise<number> {
   const repoDir = argOf('--repo-dir')
 
   if (!incidentPath || !articlePath || !repoDir) {
-    process.stderr.write('usage: verify --incident <f> --article <f> --repo-dir <dir> [--previous <f>]\n')
+    process.stderr.write('usage: verify --incident <f> --article <f> --repo-dir <dir> [--content-dir <dir>]\n')
     return 2
   }
 
   const incident = Incident.parse(JSON.parse(await readFile(incidentPath, 'utf8')))
   const article = Article.parse(JSON.parse(await readFile(articlePath, 'utf8')))
-  const previousPath = argOf('--previous')
-  const previous: PreviouslyPublished | null = previousPath
-    ? (JSON.parse(await readFile(previousPath, 'utf8')) as PreviouslyPublished)
-    : null
+  // The prior publication is READ FROM THE PUBLISHED TREE, not from a file named
+  // on the command line. The rules below refuse a moved `publishedAt` and a
+  // changed identity; feeding them a hand-written file would let the run being
+  // checked also supply the record it is checked against.
+  const contentDir = argOf('--content-dir')
+  const previous = contentDir ? await readManifest(incidentDir(contentDir, incident.id)) : null
 
   /** Reports one result the same way whether it came from preflight or from verify. */
   const report = (result: { verdict: string; findings: { verdict: string; rule: string; detail: string }[] }, probeCount: number) => {

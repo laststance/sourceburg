@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { Article, Incident } from './schema'
+import { identityOf } from './verify/plan'
 
-import type { IdentityTuple } from './verify/plan'
+import type { PreviouslyPublished } from './verify/plan'
 
 /*
  * Publication is a POINTER SWAP, never a directory swap.
@@ -20,13 +21,14 @@ import type { IdentityTuple } from './verify/plan'
  * power loss would need `F_FULLFSYNC` on darwin and is not what P43 tests.
  */
 
-/** What `manifest.json` holds. Small on purpose: it is the file the swap moves. */
-export type Manifest = {
-  version: string
-  identity: IdentityTuple
-  publishedAt: string
-  updatedAt: string
-}
+/*
+ * What `manifest.json` holds, DERIVED from {@link PreviouslyPublished} rather
+ * than re-declared. The verifier's republication rules read a
+ * {@link PreviouslyPublished}; a manifest IS one, plus the version it points at.
+ * Spelling the four fields out twice would compile forever under structural
+ * typing and drift the first time a field is added to one side only.
+ */
+export type Manifest = PreviouslyPublished & { version: string }
 
 const MANIFEST = 'manifest.json'
 const MANIFEST_TMP = 'manifest.tmp'
@@ -57,14 +59,6 @@ export function versionHash(incident: Incident, article: Article): string {
     .update(JSON.stringify({ incident: canonical(incident), article: canonical(article) }))
     .digest('hex')
   return `v-${digest.slice(0, 16)}`
-}
-
-export function identityOf(incident: Incident): IdentityTuple {
-  return {
-    nameWithOwner: incident.repo.nameWithOwner,
-    id: incident.id,
-    anchorSha: incident.anchorSha,
-  }
 }
 
 /** Where one incident's versions and pointer live. */
@@ -155,14 +149,6 @@ export async function swapPointer(dir: string, manifest: Manifest): Promise<void
   const tmp = join(dir, MANIFEST_TMP)
   await writeFile(tmp, JSON.stringify(manifest, null, 2), 'utf8')
   await rename(tmp, join(dir, MANIFEST))
-}
-
-/** Version directories no manifest points at, oldest publication's leftovers included. */
-export async function staleVersions(dir: string, keep: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true })
-  return entries
-    .filter((e) => e.isDirectory() && e.name.startsWith('v-') && e.name !== keep)
-    .map((e) => e.name)
 }
 
 /**

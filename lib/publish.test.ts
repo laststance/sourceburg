@@ -15,6 +15,7 @@ import {
   versionHash,
 } from './publish'
 import { articleFixture, incidentFixture } from './verify/fixtures'
+import { pureRules } from './verify/verify'
 
 const ROOT = import.meta.dirname
 const UPDATED_AT = '2026-09-01T00:00:00Z'
@@ -212,5 +213,23 @@ describe('publish', () => {
     expect(second.publishedAt).toBe('2026-09-01T00:00:00Z')
     expect(published?.article.title).toBe('A field-array fix was reverted within nine days, twice')
     expect(await readManifest(dir)).toEqual(second)
+  })
+})
+
+describe('the manifest as the verifier reads it', () => {
+  it('freezes publishedAt against the manifest publish actually wrote, not a hand-written one', async () => {
+    // Arrange — publish once, then re-read the pointer the way `verify --content-dir` does.
+    const contentDir = await contentRoot()
+    const first = await publish(incident, article, { contentDir, updatedAt: UPDATED_AT })
+    const previous = await readManifest(incidentDir(contentDir, incident.id))
+    const backdated = { ...article, publishedAt: '2026-08-01T00:00:00Z' }
+
+    // Act — the manifest goes straight in as the prior publication, no adapter.
+    const rules = pureRules(incident, backdated, previous).map((finding) => finding.rule)
+
+    // Assert
+    expect(previous?.publishedAt).toBe('2026-09-01T00:00:00Z')
+    expect(previous?.version).toBe(first.version)
+    expect(rules).toContain('publishedAt is frozen once published')
   })
 })

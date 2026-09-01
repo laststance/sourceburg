@@ -4,6 +4,7 @@ import { assignCitationNumbers } from '../citations'
 import { MAX_QUOTED_LINES_PER_PATH, MAX_QUOTED_RATIO, PROSE_CHARS_PER_LINE, EXCERPTABLE_LICENSES } from '../constants'
 import { articleRefs } from '../facts'
 import { articleSchemaFor } from '../schema'
+import { identityOf } from './plan'
 import { probeId } from './probe'
 import { resultOf } from './result'
 
@@ -376,11 +377,7 @@ export function pureRules(
   // ---- republication cannot rewrite history ----------------------------------
 
   if (previous !== null) {
-    const identity = {
-      nameWithOwner: incident.repo.nameWithOwner,
-      id: incident.id,
-      anchorSha: incident.anchorSha,
-    }
+    const identity = identityOf(incident)
     for (const key of ['nameWithOwner', 'id', 'anchorSha'] as const) {
       if (identity[key] !== previous.identity[key]) {
         findings.push(
