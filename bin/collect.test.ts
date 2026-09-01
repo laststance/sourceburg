@@ -160,6 +160,19 @@ else { process.stderr.write('HTTP 404: Not Found'); process.exit(1) }
     expect(incident.revealedLater[0].at).toBe('2026-05-10T11:00:00Z')
   })
 
+  it('lists a commit once when the anchor is also passed as --commit', () => {
+    // Arrange — the anchor named twice, the way an operator pasting a sha would.
+    const args = [...fullRun('deduped.json', 'it thrashes keys', 'src/a.ts:2-3'), '--commit', anchorSha]
+
+    // Act
+    const run = runCli(...args)
+    const incident = JSON.parse(readFileSync(join(dir, 'deduped.json'), 'utf8'))
+
+    // Assert — two commits, not three: the timeline box prints one row per entry.
+    expect(run.status).toBe(0)
+    expect(incident.commits.map((commit: { sha: string }) => commit.sha)).toEqual([anchorSha, parentSha])
+  })
+
   it('refuses an excerpt that is not in the fetched body rather than adjusting it to fit', () => {
     // Arrange & Act — one word off from what the fake comment actually says.
     const run = runCli(...fullRun('near-miss.json', 'it thrashes the keys', 'src/a.ts:2-3'))

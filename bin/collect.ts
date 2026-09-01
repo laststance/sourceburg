@@ -25,8 +25,10 @@ import type { ProbeRequest, ProbeResult, ProbeSpec } from '../lib/verify/probe'
  * `--reason`, the `--quote` excerpts, and the `--revealed` prose — an id, an
  * editorial judgment, a choice of which sentence to quote, and a claim about
  * what an event revealed. Every date, subject, hash, comment body, code line,
- * and diff hunk is fetched. `bin/collect.test.ts` asserts that mechanically, so
- * a `--committed-at` convenience flag cannot be added quietly.
+ * and diff hunk is fetched. `bin/collect.test.ts` asserts that mechanically —
+ * for a hand-maintained list of fields, so a `--committed-at` flag for one of
+ * THOSE cannot be added quietly. A field added to {@link Incident} later is not
+ * covered until someone adds it to that list too.
  *
  * Every fetch goes through {@link execute}, the same layer the verifier uses, so
  * collection and verification share one command construction. A fact gathered by
@@ -102,7 +104,11 @@ async function main(): Promise<number> {
   // ---- resolve every revision before any fact is fetched ---------------------
 
   const anchorSha = await resolveSha(repoDir, anchorArg)
+  // The anchor leads, then the rest, deduped like `discussionNumbers` below:
+  // `--commit <anchor>` (or the same commit under a tag and a sha) is a natural
+  // thing to type, and a repeat would print the same timeline row twice.
   const commitShas = [anchorSha, ...(await Promise.all(argsOf('--commit').map((rev) => resolveSha(repoDir, rev))))]
+    .filter((sha, i, all) => all.indexOf(sha) === i)
   const codeSpecs = await Promise.all(argsOf('--code').map((spec) => parseCodeArg(repoDir, spec)))
 
   const diffArg = argOf('--diff')

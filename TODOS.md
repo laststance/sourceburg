@@ -135,33 +135,59 @@ written against a real repo.
 
 ---
 
-## 5. `spdxLicense` is an unverified fact
+## 5. Three facts nothing verifies: `spdxLicense`, `defaultBranch`, `commits[].subject`
 
-**What:** Give the probe vocabulary a way to check `incident.repo.spdxLicense` and
-`incident.repo.defaultBranch` against GitHub, the way every sha, date, and quoted
-line is already checked.
+**What:** Give the probe vocabulary a way to check `incident.repo.spdxLicense`,
+`incident.repo.defaultBranch`, and `incident.commits[].subject` against their
+sources, the way every sha, date, and quoted line is already checked.
 
-**Why:** The license policy is a real gate: `pureRules` refuses to publish a code
+**Why:** Two separate reasons, and the second one is worse.
+
+`spdxLicense` has a policy attached: `pureRules` refuses to publish a code
 excerpt from a repo whose SPDX id is not in `EXCERPTABLE_LICENSES`. That gate
-currently reads a string nothing verifies. `bin/collect.ts` fetches it from
+reads a string nothing verifies. `bin/collect.ts` fetches it from
 `gh api repos/{nwo}`, so a collected fact-set is honest — but a fact-set is a
-committed artifact that a later run parses, and an edited `spdxLicense: "MIT"` on
-a proprietary repo would pass every probe and publish the excerpt. It is the one
-fact in the schema with a policy attached and no probe behind it.
+committed artifact that a later run parses, and an edited `spdxLicense: "MIT"`
+on a proprietary repo would pass every probe and publish the excerpt.
 
-**Pros:** Closes the last gap between "every fact is verified" and what the code
-actually does. `commandFor` already speaks `gh api`; the new case is two lines.
+`commits[].subject` is worse because it **reaches the reader**.
+`datedFacts()` in `lib/facts.ts:92` pushes it as the `label` of every timeline
+entry, so a commit subject is rendered text presented as fact on a site whose
+whole claim is that every rendered fact was checked against its source.
+`spdxLicense` at least gates publication; `subject` just gets printed.
+Confirmed by grep: nothing in `plan.ts`, `verify.ts`, `probe.ts`, or
+`execute.ts` reads `commits[].subject`.
 
-**Cons:** Touches `ProbeSpec`, `probeId`, `commandFor`, `plan()`, `verify()`, and
-their tests — the four files step 4 locked down. `plan()`'s "every fact
-contributes a probe" test has to grow a case, and the rule needs a verdict for a
-repo with no license at all (GitHub returns `null`, and `NOASSERTION` is not the
-same as unlicensed).
+**Pros:** Closes the last gap between "every fact is verified" and what the
+code actually does. `commandFor` already speaks `gh api` and `git show`.
 
-**Context:** Deliberately deferred while building the collector (step 6, 2026-09-01).
-A `ghRepo` probe kind that `plan()` never emits would be dead vocabulary, so the
-collector calls `gh api repos/{nwo}` directly and says so in its header comment.
-The reasoning is recorded there and here rather than in a code comment nobody
-greps.
+**Cons — and the two shapes are not equally cheap:**
+
+- *A new `gitCommitSubject` kind* (`git show -s --format=%s <sha>^{commit}`)
+  is purely additive: one case in `ProbeSpec` / `probeId` / `commandFor` /
+  `preflight`, one `add()` in `plan()`, one rule in `verify()`, one fixture
+  entry per commit. It costs one extra git invocation per commit.
+- *Widening `gitCommitDate` to `--format=%cd%n%s`* spends no extra process, but
+  `plan()` emits `gitCommitDate` from **six** call sites and only one of them
+  (`commits[i]`) has a subject in the schema — `anchorSha`, `codeQuotes[].atSha`,
+  `diff.beforeSha`, `diff.afterSha`, and `revealedLater[].evidence.sha` would all
+  start carrying a second line nothing reads. It also changes `committerDate()`'s
+  `stdout.trim()` into a split, and every `gitCommitDate` fixture stdout with it.
+
+So the extra `git show` is probably the cheaper end of it, despite being the
+one that adds a probe. Both touch `ProbeSpec`, `probeId`, `commandFor`,
+`plan()`, `verify()`, and their tests — the four files step 4 locked down —
+and `plan()`'s "every fact contributes a probe" test has to grow a case. The
+repo rule still needs a verdict for a repo with no license at all (GitHub
+returns `null`, and `NOASSERTION` is not the same as unlicensed).
+
+**Context:** `spdxLicense` was deliberately deferred while building the
+collector (step 6, 2026-09-01): a `ghRepo` probe kind that `plan()` never
+emits would be dead vocabulary, so the collector calls `gh api repos/{nwo}`
+directly and says so in its header comment. `commits[].subject` was found
+straight after, reviewing that same step — the collector fetches it correctly
+(`git show -s --format=%s`, which prints the subject alone and never the
+commit header where author emails live), so no fact-set is dishonest today;
+the hole is in the verifier's coverage.
 
 **Depends on / blocked by:** Nothing. Cheapest to do next time `plan()` is open.
