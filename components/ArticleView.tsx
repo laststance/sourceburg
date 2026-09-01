@@ -34,7 +34,9 @@ function Headline({ incident, article }: { incident: Incident; article: Article 
   return (
     <div className="grid gap-6 border-b border-rule pb-5 md:grid-cols-[1fr_auto] md:items-start">
       <div>
-        <h1 className="font-display text-4xl leading-[0.95] tracking-tight uppercase sm:text-5xl lg:text-6xl">
+        {/* Letterpress scale: the design asks for 3 lines at desktop and 4-5 on a
+            phone, which is what makes it the heaviest thing on the screen. */}
+        <h1 className="font-display text-5xl leading-[0.92] tracking-tight uppercase sm:text-6xl lg:text-7xl">
           {article.title}
         </h1>
         <p className="mt-4 max-w-[46ch] font-serif text-lg leading-7">{article.dek}</p>
@@ -84,7 +86,10 @@ export function ArticleView({ incident, article }: { incident: Incident; article
             track takes its min-content width from the longest unbreakable thing in it,
             and one permalink is enough to crush the rail to a few words wide. */}
         <section className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(17rem,1fr)] lg:items-start">
-          <div>
+          {/* `min-w-0`: a grid item defaults to min-width:auto, so one unbreakable
+              code line inside sets the track's floor and the whole column grows past
+              the viewport. This is what makes the page scroll sideways without it. */}
+          <div className="min-w-0">
             <h2 className="mb-3 font-display text-sm tracking-widest uppercase">Breaking</h2>
             {/* Multi-column below the heading; ragged and single-column under 768px. */}
             <div className="md:columns-2 md:gap-8 lg:columns-3">
@@ -95,7 +100,7 @@ export function ArticleView({ incident, article }: { incident: Incident; article
           </div>
           {/* The rail follows the breaking half in the DOM, so it reads last on a phone. */}
           {rail.length === 0 ? null : (
-            <aside aria-label="Supporting detail">
+            <aside aria-label="Supporting detail" className="min-w-0">
               {rail.map((block, index) => (
                 <Block key={index} block={block} context={context} />
               ))}

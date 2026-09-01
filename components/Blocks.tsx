@@ -229,12 +229,15 @@ function TimelineBox({ context }: { context: BlockContext }) {
         * give each entry ~40px, and the labels stack one letter wide. Full width is
         * also the only place the design's "horizontal dated chart" is legible at all.
         */}
-      <ol className="flex flex-col gap-2 md:flex-row md:gap-0">
+      {/*
+        * One rule instead of three breakpoints: `auto-fit` with a 9rem floor fits as
+        * many dated columns as the width allows and wraps the rest onto a second row.
+        * A fixed 8-across is unreadable at tablet (each entry gets ~105px and the
+        * labels stack one word wide) and a fixed vertical list wastes a desktop.
+        */}
+      <ol className="grid gap-x-4 gap-y-4 [grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))]">
         {facts.map((fact) => (
-          <li
-            key={`${fact.at}-${fact.ref}`}
-            className="border-t border-rule pt-2 first:border-t-0 first:pt-0 md:flex-1 md:border-t-0 md:border-l md:px-3 md:pt-0 md:first:border-l-0 md:first:pl-0"
-          >
+          <li key={`${fact.at}-${fact.ref}`} className="border-t border-rule pt-2">
             <p className="font-mono text-[0.7rem] tracking-wide uppercase opacity-70">{fact.at.slice(0, 10)}</p>
             <p className="font-serif text-sm leading-5">
               {fact.label}

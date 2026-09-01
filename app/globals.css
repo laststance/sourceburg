@@ -67,6 +67,8 @@ body {
  */
 .code-scroll {
   overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
   background-image: linear-gradient(to left, color-mix(in srgb, var(--ink) 14%, transparent), transparent 2rem);
   background-position: right;
   background-repeat: no-repeat;
