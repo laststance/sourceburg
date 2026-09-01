@@ -12,7 +12,8 @@
     "e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "verify": "tsx bin/verify.ts",
-    "collect": "tsx bin/collect.ts"
+    "collect": "tsx bin/collect.ts",
+    "eval:injection": "tsx evals/injection/run.ts"
   },
   "dependencies": {
     "next": "16.3.3",

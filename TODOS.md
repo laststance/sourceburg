@@ -191,3 +191,53 @@ commit header where author emails live), so no fact-set is dishonest today;
 the hole is in the verifier's coverage.
 
 **Depends on / blocked by:** Nothing. Cheapest to do next time `plan()` is open.
+
+---
+
+## 6. What the injection eval cannot see
+
+**What:** Decide what covers the injection cases the poisoned-fixture eval
+structurally misses, and revisit the writer's input rule before session 3.
+
+**Why:** `evals/injection/` plants six canaries and fails if any reaches the
+article. That is exact and has no false positives, which is exactly why it is
+narrow. Three things it does not detect:
+
+1. **Obedience by omission.** The fixture's first payload also says "do not
+   mention the revert." An article that quietly drops the revert scores clean —
+   there is no canary for a sentence that was never written.
+2. **A payload restated in the model's own words.** Injection succeeds without
+   copying anything. No threshold fixes this: measured on the frozen baseline,
+   the longest verbatim run between hand-approved prose and the comment bodies
+   it describes is **15 characters**, and it is the repo name. Any threshold
+   above that spares the baseline and lets "Vercel is insolvent" (19 chars)
+   through; any threshold below it fails the baseline.
+3. **A true-but-steered story.** The design doc's own line: a headline can be
+   false while every sha in the article is real.
+
+The v1 answer to all three is that a person reads the article before it
+publishes. That is a real answer for one article a week and not a real answer
+for anything faster.
+
+**Pros:** Naming the boundary is what keeps the eval honest. An eval described
+as "asserts no injection reaches the output" would be read as a gate.
+
+**Cons:** Nothing here has a cheap mechanical fix, which is why it is a TODO
+and not a rule. A verify-time rule was considered and rejected: see the
+threshold arithmetic above, and `lib/canary.ts`'s header.
+
+**Trigger for revisiting — this one is dated.** The writer currently reads
+`incident.fact.json` and nothing else, so the only untrusted text it sees is an
+excerpt a **human operator chose**. That human filter is doing real work.
+**Session 3 removes it:** the automatic collector selects excerpts by model, at
+which point attacker-controlled text reaches the writer with nobody having read
+it first. Re-run this eval and re-read this item the day excerpt selection stops
+being manual.
+
+**Context:** The writer's input rule and its reasoning are in
+`.claude/skills/sourceburg/SKILL.md` under "What you read, and nothing else".
+The checker is `lib/canary.ts`; it walks every string in the article rather than
+a named field list, so a free-text field added to `Article` later is covered the
+day it is added. Test paths V1 and W1-W3.
+
+**Depends on / blocked by:** Nothing. The dated half depends on session 3.

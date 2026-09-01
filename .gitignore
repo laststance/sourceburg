@@ -47,3 +47,14 @@ next-env.d.ts
 /playwright-report/
 # decision 13A: full fetched comment bodies are cached locally, never committed
 /content/**/cache/
+
+# The writer is a skill, so it is project source and has to ship with the repo.
+# The global gitignore excludes `.claude` wholesale (personal agent config, which
+# is the right default). Re-include the skills tree only — a `settings.local.json`
+# landing here later still stays out.
+!.claude/
+.claude/*
+!.claude/skills/
+
+# Serena's on-disk index, regenerated on demand.
+/.serena/
