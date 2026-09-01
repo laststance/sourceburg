@@ -47,19 +47,27 @@ const jetBrainsMono = JetBrains_Mono({
  * a reader on `larger` would watch the article resize itself on every navigation, and
  * this site's own rule is that nothing animates.
  *
- * This is the one `dangerouslySetInnerHTML` in the tree, and `lib/highlight.test.ts`
- * fails the build if a second appears. The distinction it enforces: this string is a
- * frozen literal built from two constants in this repo, and it writes what it reads into
- * an ATTRIBUTE, where an unknown value matches no CSS rule and falls back to the design.
- * A renderer handing fact-set text to the same prop would be markup, which is the thing
- * that must never happen.
+ * This is the one `dangerouslySetInnerHTML` in the tree, and `lib/highlight.test.ts` fails
+ * on a second one. That test runs under `pnpm test`, NOT under `next build` — nothing gates
+ * a deploy on it, so treat it as a tripwire a person still has to look at, not a wall. The
+ * distinction it draws: this string is a frozen literal built from two constants in this
+ * repo, and it writes what it reads into an ATTRIBUTE, where an unknown value matches no
+ * CSS rule and falls back to the design. A renderer handing fact-set text to the same prop
+ * would be markup, which is the thing that must never happen.
  */
-const READING_PREFERENCE_SCRIPT =
+const READING_PREFERENCE_SCRIPT = (
   `(function(){try{var root=document.documentElement;` +
   `var font=localStorage.getItem(${JSON.stringify(READING_FONT_KEY)});` +
   `if(font)root.setAttribute(${JSON.stringify(READING_FONT_ATTR)},font);` +
   `var size=localStorage.getItem(${JSON.stringify(READING_SIZE_KEY)});` +
   `if(size)root.setAttribute(${JSON.stringify(READING_SIZE_ATTR)},size)}catch(e){}})()`
+)
+  // `JSON.stringify` escapes quotes and backslashes but leaves `<` alone, so a constant
+  // above that ever contained `</script>` would close this tag and put the rest on the page
+  // as markup. None of the four can today — they are fixed literals a few lines apart in
+  // `lib/constants.ts` — and this closes the door anyway, because the cost is one call and
+  // the failure mode is the one thing this file promises cannot happen.
+  .replace(/</g, String.raw`\u003c`)
 
 export const metadata: Metadata = {
   title: { default: 'sourceburg', template: '%s · sourceburg' },

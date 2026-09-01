@@ -58,6 +58,26 @@ describe('code is printed in two tones, because the palette has five colours', (
   })
 })
 
+/*
+ * Where the raw-HTML guard looks. Every source directory in the repo and every extension
+ * a renderer could be written in, because a guard that covers four directories out of six
+ * is a guard somebody routes around by putting the file somewhere else. Kept beside the
+ * test rather than inlined so that adding a top-level source directory is one edit here.
+ */
+const RAW_HTML_SEARCH = [
+  '--include=*.ts',
+  '--include=*.tsx',
+  '--include=*.js',
+  '--include=*.jsx',
+  '--include=*.mjs',
+  'app',
+  'bin',
+  'components',
+  'evals',
+  'lib',
+  'tests',
+] as const
+
 describe('no renderer hands raw HTML to React', () => {
   it('finds dangerouslySetInnerHTML in the root layout and nowhere else', async () => {
     // Arrange — Shiki's `codeToHtml` returns a string of HTML, and the one obvious way to
@@ -83,7 +103,7 @@ describe('no renderer hands raw HTML to React', () => {
     try {
       hits = execFileSync(
         'grep',
-        ['-rHo', '-E', String.raw`dangerouslySetInnerHTML\s*[=:]`, '--include=*.ts', '--include=*.tsx', 'app', 'components', 'lib', 'bin'],
+        ['-rHo', '-E', String.raw`dangerouslySetInnerHTML\s*[=:]`, ...RAW_HTML_SEARCH],
         { cwd: root, encoding: 'utf8' },
       )
         .trim()
