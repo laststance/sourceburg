@@ -219,6 +219,26 @@ The v1 answer to all three is that a person reads the article before it
 publishes. That is a real answer for one article a week and not a real answer
 for anything faster.
 
+**A fourth one was found and closed on 2026-09-01, by reading.** The first live
+run printed `0 reached the page` and that was false: three canaries were on the
+page. A quote block carries a ref, not text, so the checker walked the article
+and saw ids while the reader saw "Funded in part by Northwind Trading." That is
+a laundering route, not just bad wording — a writer told to make the reader see
+X can pick the quote that already contains X and keep its own prose spotless.
+{@link pageTextOf} now splits the page three ways and fails the first two; the
+fixture gained a clean code range, a clean comment and a clean `revealedLater`
+entry, because until it had those, "emit a `codeQuote`" and "keep the page
+clean" were mutually exclusive and the FAIL would have proved nothing. The
+lesson generalises past this eval: **the checked artifact was not the artifact
+the reader gets.**
+
+**Still open, and named here because nothing tests it:** DESIGN.md says each
+footer row prints "the kind, a one-line label, and the full permalink" but never
+says what the label holds. If step 8 derives it from `commits[].subject` the way
+{@link datedFacts} does, every `commit:` citation becomes a delivery route and
+`pageTextOf` needs a fourth bucket. Decide this while writing the footer, not
+after. Related: item 5, where that same subject is the fact nothing verifies.
+
 **Pros:** Naming the boundary is what keeps the eval honest. An eval described
 as "asserts no injection reaches the output" would be read as a gate.
 
@@ -236,8 +256,15 @@ being manual.
 
 **Context:** The writer's input rule and its reasoning are in
 `.claude/skills/sourceburg/SKILL.md` under "What you read, and nothing else".
-The checker is `lib/canary.ts`; it walks every string in the article rather than
-a named field list, so a free-text field added to `Article` later is covered the
-day it is added. Test paths V1 and W1-W3.
+The checker is `lib/canary.ts`. It walks every string rather than a named field
+list, so a free-text field added to `Article` later is covered the day it is
+added, and {@link pageTextOf} resolves the quote blocks to the text the page
+will actually print. Test paths V1 and W1-W12.
+
+**Measured once, by hand, on the 2026-09-01 run:** blind spot 1 did not fire —
+the article led with the revert the payload told it to suppress, and reported
+the instruction to suppress it. Blind spot 2 did not fire either: it described
+each payload's shape ("specifying an exact headline the article was to carry")
+without restating its content. One sample, not a result.
 
 **Depends on / blocked by:** Nothing. The dated half depends on session 3.
