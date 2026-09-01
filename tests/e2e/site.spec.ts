@@ -7,7 +7,7 @@ import { articleHref } from '../../lib/links'
 import type { Published } from '../../lib/publish'
 
 /*
- * The ten reader paths, run at all three viewports by the config's projects.
+ * The thirteen reader paths, run at all three viewports by the config's projects.
  *
  * Asserted against the REAL published content rather than a fixture, for the same
  * reason the render layer's four layout bugs only appeared once incident #1 was on
@@ -18,6 +18,13 @@ import type { Published } from '../../lib/publish'
  * doing it twice in a browser would be slower and no more true. These tests ask
  * only what a reader can see.
  */
+
+declare global {
+  interface Window {
+    /** Written by one test's init script below: every `data-reading-*` write, in order. */
+    __attributeWrites: string[]
+  }
+}
 
 /** The newest published incident, read once per worker. Async, so it cannot be a const. */
 let cached: Published | null = null
@@ -149,6 +156,72 @@ test.describe('a reader can retype the page without losing it', () => {
     // The bug this guards is the one that has bitten this layout three times: a grid
     // track sized to min-content, found only once the content got wide enough.
     expect(overflow.scrollWidth).toBe(overflow.clientWidth)
+  })
+
+  test('lets a text-size utility win over the column rule', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    const paragraph = page.locator('.column-text').first()
+
+    // Act — the same thing a person writes in the JSX: a Tailwind size beside the class.
+    const withUtility = await paragraph.evaluate((element) => {
+      element.classList.add('text-2xl')
+      return parseFloat(getComputedStyle(element).fontSize)
+    })
+
+    // Assert — `.column-text` used to sit OUTSIDE a cascade layer, and an unlayered rule
+    // beats every utility whatever its specificity, so this silently rendered at 16px and
+    // nothing said so. Two prose renderers had their `text-base` stripped in the same
+    // change, which is what made the trap live.
+    expect(withUtility).toBe(24)
+  })
+
+  test('gives every menu row a 44px target', async ({ page }) => {
+    // Arrange
+    await page.goto(articleHref((await newest()).incident))
+    await page.getByText('Reading options').click()
+
+    // Act
+    const rowHeights = await page
+      .locator('label:has(input[name="reading-size"])')
+      .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height))
+
+    // Assert — 44px is what this site gives its own cite markers, and the reader most likely
+    // to want this menu is the one least able to hit a 32px row.
+    expect(rowHeights).toEqual([44, 44, 44])
+  })
+
+  test('never rewrites a returning reader choice back to the default while hydrating', async ({ page }) => {
+    // Arrange — a returning reader on sans + larger, with every write to the two attributes
+    // recorded from before the first script on the page runs.
+    await page.addInitScript(() => {
+      // BOTH keys, so that either default appearing below is a revert and never just an
+      // unset value legitimately resolving to the design.
+      localStorage.setItem('sourceburg:reading-font', 'sans')
+      localStorage.setItem('sourceburg:reading-size', 'larger')
+      const writes: string[] = []
+      Object.defineProperty(window, '__attributeWrites', { value: writes })
+      const original = Element.prototype.setAttribute
+      Element.prototype.setAttribute = function (name: string, value: string) {
+        if (this === document.documentElement && name.startsWith('data-reading-')) {
+          writes.push(`${name}=${value}`)
+        }
+        return original.call(this, name, value)
+      }
+    })
+    await page.goto(articleHref((await newest()).incident))
+
+    // Act — the checked radio is the signal that React has hydrated and had its say.
+    await page.getByText('Reading options').click()
+    await expect(page.getByRole('radio', { name: 'Larger' })).toBeChecked()
+    const writes = await page.evaluate(() => window.__attributeWrites)
+
+    // Assert — an effect keyed on the rendered value fired first with the SERVER snapshot,
+    // so it wrote `regular` over what the pre-paint script had set and restored `larger` a
+    // render later, on every single load. It never painted in between, because the two are
+    // one main-thread task, but it was a flash waiting for React to yield once.
+    expect(writes).not.toContain('data-reading-size=regular')
+    expect(writes).not.toContain('data-reading-font=serif')
   })
 
   test('has no axe-detectable violations with the reading menu open', async ({ page }) => {

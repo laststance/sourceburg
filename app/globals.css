@@ -116,16 +116,30 @@ body {
   font-family: var(--font-mono);
 }
 
-/* Justified serif at desktop measure; ragged right below 768px, where justification opens rivers. */
-.column-text {
-  text-align: justify;
-  hyphens: auto;
-  font-size: 1em;
-  line-height: 1.75;
-}
-@media (max-width: 767px) {
+/*
+ * Justified serif at desktop measure; ragged right below 768px, where justification opens
+ * rivers.
+ *
+ * Inside `@layer components` on purpose. An UNLAYERED rule beats every Tailwind utility no
+ * matter the specificity, so out here `<p className="column-text text-lg">` silently
+ * rendered at the size below and no error said so. Layered, the utility wins, which is what
+ * anyone reading the JSX expects. `line-height` shadows `leading-*` the same way, so it
+ * belongs in here too.
+ *
+ * No `font-size` at all: this text takes its size from `body`, which is where the reader's
+ * scale is applied. The `font-size: 1em` that used to sit here could not change anything —
+ * `1em` IS the inherited size — so its only effect was that shadowing.
+ */
+@layer components {
   .column-text {
-    text-align: left;
-    hyphens: manual;
+    text-align: justify;
+    hyphens: auto;
+    line-height: 1.75;
+  }
+  @media (max-width: 767px) {
+    .column-text {
+      text-align: left;
+      hyphens: manual;
+    }
   }
 }

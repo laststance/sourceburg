@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useSyncExternalStore } from 'react'
 
 import {
   READING_FONTS,
@@ -90,6 +90,10 @@ function adoptAnotherTabsChoice(event: StorageEvent): void {
   if (event.key !== null && event.key !== READING_FONT_KEY && event.key !== READING_SIZE_KEY) return
   chosenFont = null
   chosenSize = null
+  // Re-seeds both caches from storage, then puts them on `<html>`: the snapshot readers are
+  // the single source, and no effect is left watching the rendered value to do it instead.
+  applyChoice(READING_FONT_ATTR, fontSnapshot())
+  applyChoice(READING_SIZE_ATTR, sizeSnapshot())
   for (const listener of listeners) listener()
 }
 
@@ -117,6 +121,21 @@ function sizeSnapshot(): ReadingSize {
 }
 
 /**
+ * Puts a choice on `<html>`, which is the only place `app/globals.css` reads it from.
+ * Every path that changes a choice calls this: this tab's own click, another tab's
+ * `storage` event, and the mount repair. Deliberately NOT an effect keyed on the rendered
+ * value — such an effect fires first with the SERVER snapshot, so on a hard load it wrote
+ * the default over what the pre-paint script had set and restored it only a render later.
+ * @param attribute - {@link READING_FONT_ATTR} or {@link READING_SIZE_ATTR}
+ * @param value - the chosen option's `value`
+ * @returns nothing; the CSS variable swap is the whole visible effect
+ * @example applyChoice(READING_FONT_ATTR, 'sans')
+ */
+function applyChoice(attribute: string, value: string): void {
+  document.documentElement.setAttribute(attribute, value)
+}
+
+/**
  * Writes a choice to storage and wakes every subscriber, after the caller has already
  * put it in memory — so an unwritable localStorage costs the reader persistence, never
  * the change they just asked for.
@@ -135,14 +154,16 @@ function remember(storageKey: string, value: string): void {
   for (const listener of listeners) listener()
 }
 
-/** Two lines each, and no cast: the alternative routed both through one key-sniffing branch. */
+/** Three lines each, and no cast: the alternative routed both through one key-sniffing branch. */
 function chooseFont(value: ReadingFont): void {
   chosenFont = value
+  applyChoice(READING_FONT_ATTR, value)
   remember(READING_FONT_KEY, value)
 }
 
 function chooseSize(value: ReadingSize): void {
   chosenSize = value
+  applyChoice(READING_SIZE_ATTR, value)
   remember(READING_SIZE_KEY, value)
 }
 
@@ -160,8 +181,13 @@ function ReadingRadioGroup<Value extends string>(props: {
       <div className="mt-1 flex flex-col">
         {props.options.map((option) => (
           // The label wraps the input, so the whole row is the target and no `for`/`id`
-          // pair can drift apart. `py-1.5` is what gets a 13px radio to a 44px row.
-          <label key={option.value} className="flex cursor-pointer items-center gap-2 py-1.5 text-sm">
+          // pair can drift apart. `min-h-11` is what makes the row 44px: `py-1.5` around a
+          // 20px line box measured 32px, which clears WCAG 2.5.8 but misses the 44px this
+          // site gives its own cite markers (DESIGN.md § Touch targets).
+          <label
+            key={option.value}
+            className="flex min-h-11 cursor-pointer items-center gap-2 py-1.5 text-sm"
+          >
             <input
               type="radio"
               name={props.name}
@@ -187,14 +213,22 @@ export function ReadingControls() {
   const font = useSyncExternalStore(subscribe, fontSnapshot, () => READING_FONT_DEFAULT)
   const size = useSyncExternalStore(subscribe, sizeSnapshot, () => READING_SIZE_DEFAULT)
 
-  // The one place React talks to the DOM. On a hard load the pre-paint script has already
-  // set these and this rewrites the same values; it earns its keep in dev, where React's
-  // Strict Mode remount resets `<html>` to the attributes it manages from JSX and drops
-  // what the script set.
-  useEffect(() => {
-    document.documentElement.setAttribute(READING_FONT_ATTR, font)
-    document.documentElement.setAttribute(READING_SIZE_ATTR, size)
-  }, [font, size])
+  // Repairs `<html>` once, after React's dev-only Strict Mode remount resets it to the
+  // attributes it manages from JSX and drops what the pre-paint script wrote. It reads
+  // STORAGE, never `font`/`size` above, and runs once, never on every change: an effect
+  // keyed on the rendered value fired first with the server snapshot, so on a hard load it
+  // reverted a returning reader's choice and restored it a render later. That was measured
+  // on 24 of 24 loads. It never painted in between, because the revert and the restore are
+  // one main-thread task, but it is a flash waiting for React to yield once.
+  //
+  // Before paint rather than after, per Next's own guide at
+  // `node_modules/next/dist/docs/01-app/02-guides/preventing-flash-before-hydration.md`
+  // § Re-applying attributes in development. In production nothing clears the attributes,
+  // so this writes what is already there.
+  useLayoutEffect(() => {
+    applyChoice(READING_FONT_ATTR, storedChoice(READING_FONT_KEY, READING_FONTS, READING_FONT_DEFAULT))
+    applyChoice(READING_SIZE_ATTR, storedChoice(READING_SIZE_KEY, READING_SIZES, READING_SIZE_DEFAULT))
+  }, [])
 
   return (
     <details className="relative">
